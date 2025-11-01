@@ -9,3 +9,26 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
+
+/* Enhanced markdown table styles */
+.prose table {
+  border-spacing: 0;
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1);
+  border-radius: 0.5rem;
+  overflow: hidden;
+}
+
+.prose th {
+  background: linear-gradient(to bottom, #f9fafb, #f3f4f6);
+  text-transform: uppercase;
+  font-size: 0.75rem;
+  letter-spacing: 0.05em;
+}
+
+.prose td {
+  font-size: 0.875rem;
+}
+
+.prose tr:hover {
+  background-color: #f9fafb;
+}

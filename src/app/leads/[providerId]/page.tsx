@@ -4,6 +4,8 @@ import { useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import { ArrowLeft, AlertTriangle, TrendingUp, Activity, Sparkles, Loader2, Info } from 'lucide-react'
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 
 export default function LeadDetailPage() {
   const params = useParams()
@@ -34,6 +36,7 @@ export default function LeadDetailPage() {
       })
 
       const data = await response.json()
+      
       if (response.ok) {
         setAgentAnalysis(data.analysis)
       }
@@ -129,20 +132,18 @@ export default function LeadDetailPage() {
         </div>
       </div>
 
-      {/* Overall Score Card */}
       <div className="bg-gradient-to-r from-red-50 to-orange-50 rounded-lg p-6 border-2 border-red-200 mb-8">
         <div className="flex items-center justify-between mb-4">
           <div>
             <div className="text-sm font-medium text-gray-600 mb-1">Overall FWA Score</div>
             <div className="text-5xl font-bold text-red-600">{leadData.overallScore.toFixed(1)}</div>
             <p className="text-sm text-gray-600 mt-2">
-              Combined score from all detection tiers below
+              Combined score from all detection tiers
             </p>
           </div>
           <AlertTriangle className="w-16 h-16 text-red-400" />
         </div>
         
-        {/* Tier Breakdown with Descriptions */}
         <div className="mt-6 pt-6 border-t border-red-200">
           <div className="flex items-center mb-4">
             <Info className="w-5 h-5 text-indigo-600 mr-2" />
@@ -191,7 +192,6 @@ export default function LeadDetailPage() {
         </div>
       </div>
 
-      {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
         <div className="bg-white rounded-lg shadow p-6">
           <div className="flex items-center justify-between mb-2">
@@ -199,7 +199,7 @@ export default function LeadDetailPage() {
             <Activity className="w-5 h-5 text-gray-400" />
           </div>
           <div className="text-3xl font-bold text-gray-900">{leadData.claimCount}</div>
-          <p className="text-xs text-gray-500 mt-1">Claims analyzed for this provider</p>
+          <p className="text-xs text-gray-500 mt-1">Claims analyzed</p>
         </div>
 
         <div className="bg-white rounded-lg shadow p-6">
@@ -208,7 +208,7 @@ export default function LeadDetailPage() {
             <TrendingUp className="w-5 h-5 text-orange-400" />
           </div>
           <div className="text-3xl font-bold text-orange-600">{allMetrics.length}</div>
-          <p className="text-xs text-gray-500 mt-1">Anomaly patterns triggered</p>
+          <p className="text-xs text-gray-500 mt-1">Anomaly patterns</p>
         </div>
 
         <div className="bg-white rounded-lg shadow p-6">
@@ -218,14 +218,13 @@ export default function LeadDetailPage() {
           </div>
           <div className="text-2xl font-bold text-red-600">{leadData.priority}</div>
           <p className="text-xs text-gray-500 mt-1">
-            {leadData.priority === 'HIGH' ? 'Immediate investigation needed' :
-             leadData.priority === 'MEDIUM' ? 'Ongoing surveillance warranted' :
+            {leadData.priority === 'HIGH' ? 'Immediate investigation' :
+             leadData.priority === 'MEDIUM' ? 'Surveillance warranted' :
              'Monitor for escalation'}
           </p>
         </div>
       </div>
 
-      {/* AI Agent Analysis Section */}
       <div className="bg-gradient-to-r from-purple-50 to-blue-50 rounded-lg p-6 border-2 border-purple-200 mb-8">
         <div className="flex items-start justify-between">
           <div className="flex-1">
@@ -237,8 +236,7 @@ export default function LeadDetailPage() {
             {!agentAnalysis ? (
               <>
                 <p className="text-gray-600 mb-4">
-                  Get a detailed analysis of this provider's billing patterns with specific service codes, 
-                  geographic data, and actionable investigation steps.
+                  Get detailed analysis with specific CPT codes, dollar amounts, and investigation steps.
                 </p>
                 <button
                   onClick={analyzeWithAI}
@@ -260,10 +258,19 @@ export default function LeadDetailPage() {
               </>
             ) : (
               <div className="bg-white rounded-lg p-6 border border-purple-200">
-                <div className="prose max-w-none">
-                  <div className="whitespace-pre-wrap text-gray-700 leading-relaxed text-sm">
+                <div className="prose prose-sm max-w-none 
+                  prose-headings:text-gray-900 prose-headings:font-bold
+                  prose-h3:text-lg prose-h3:mt-6 prose-h3:mb-3
+                  prose-p:text-gray-700 prose-p:leading-relaxed
+                  prose-ul:text-gray-700 prose-ul:list-disc prose-ul:ml-4
+                  prose-strong:text-gray-900 prose-strong:font-semibold
+                  prose-table:w-full prose-table:border-collapse
+                  prose-th:bg-gray-100 prose-th:border prose-th:border-gray-300 prose-th:px-4 prose-th:py-2 prose-th:text-left prose-th:font-semibold prose-th:text-gray-900
+                  prose-td:border prose-td:border-gray-300 prose-td:px-4 prose-td:py-2 prose-td:text-gray-700
+                  prose-tr:even:bg-gray-50">
+                  <ReactMarkdown remarkPlugins={[remarkGfm]}>
                     {agentAnalysis}
-                  </div>
+                  </ReactMarkdown>
                 </div>
               </div>
             )}
