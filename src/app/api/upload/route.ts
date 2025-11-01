@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import * as XLSX from 'xlsx';
+import { ruleMatcher } from '@/lib/fwa-rules/matcher';
 
 export const maxDuration = 60;
 export const dynamic = 'force-dynamic';
@@ -159,13 +160,24 @@ export async function POST(request: NextRequest) {
         return consecutiveDays >= 5;
       });
 
-      return {
+      // NEW: Match FWA rules
+      const matchedRules = ruleMatcher.matchRules({
         ...lead,
         topCodes,
         totalBilled,
         hasRoundNumbers,
         hasModifier59,
         hasDailyPattern
+      });
+
+      return {
+        ...lead,
+        topCodes,
+        totalBilled,
+        hasRoundNumbers,
+        hasModifier59,
+        hasDailyPattern,
+        matchedRules // Add matched rules to lead data
       };
     });
 

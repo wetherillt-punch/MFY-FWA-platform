@@ -257,18 +257,34 @@ export default function LeadDetailPage() {
                 </button>
               </>
             ) : (
-              <div className="bg-white rounded-lg p-6 border border-purple-200">
-                <div className="prose prose-sm max-w-none 
-                  prose-headings:text-gray-900 prose-headings:font-bold
-                  prose-h3:text-lg prose-h3:mt-6 prose-h3:mb-3
-                  prose-p:text-gray-700 prose-p:leading-relaxed
-                  prose-ul:text-gray-700 prose-ul:list-disc prose-ul:ml-4
-                  prose-strong:text-gray-900 prose-strong:font-semibold
-                  prose-table:w-full prose-table:border-collapse
-                  prose-th:bg-gray-100 prose-th:border prose-th:border-gray-300 prose-th:px-4 prose-th:py-2 prose-th:text-left prose-th:font-semibold prose-th:text-gray-900
-                  prose-td:border prose-td:border-gray-300 prose-td:px-4 prose-td:py-2 prose-td:text-gray-700
-                  prose-tr:even:bg-gray-50">
-                  <ReactMarkdown remarkPlugins={[remarkGfm]}>
+              <div className="bg-white rounded-lg p-8 border border-purple-200">
+                <div className="ai-analysis-content">
+                  <ReactMarkdown 
+                    remarkPlugins={[remarkGfm]}
+                    components={{
+                      h2: ({node, ...props}) => <h2 className="text-2xl font-bold text-gray-900 mb-6 pb-3 border-b-2 border-gray-200" {...props} />,
+                      h3: ({node, ...props}) => <h3 className="text-xl font-bold text-gray-900 mt-8 mb-4" {...props} />,
+                      p: ({node, ...props}) => <p className="text-gray-700 leading-relaxed mb-4" {...props} />,
+                      ul: ({node, ...props}) => <ul className="list-disc ml-6 mb-6 space-y-2 text-gray-700" {...props} />,
+                      ol: ({node, ...props}) => <ol className="list-decimal ml-6 mb-6 space-y-2 text-gray-700" {...props} />,
+                      li: ({node, ...props}) => <li className="leading-relaxed" {...props} />,
+                      strong: ({node, ...props}) => <strong className="font-semibold text-gray-900" {...props} />,
+                      table: ({node, ...props}) => (
+                        <div className="overflow-x-auto my-6">
+                          <table className="min-w-full border-collapse border border-gray-300 shadow-sm" {...props} />
+                        </div>
+                      ),
+                      thead: ({node, ...props}) => <thead className="bg-gradient-to-r from-gray-100 to-gray-50" {...props} />,
+                      tbody: ({node, ...props}) => <tbody className="divide-y divide-gray-200" {...props} />,
+                      tr: ({node, ...props}) => <tr className="hover:bg-gray-50 transition-colors" {...props} />,
+                      th: ({node, ...props}) => (
+                        <th className="border border-gray-300 px-6 py-3 text-left text-xs font-bold text-gray-900 uppercase tracking-wider" {...props} />
+                      ),
+                      td: ({node, ...props}) => (
+                        <td className="border border-gray-300 px-6 py-4 text-sm text-gray-700" {...props} />
+                      ),
+                    }}
+                  >
                     {agentAnalysis}
                   </ReactMarkdown>
                 </div>

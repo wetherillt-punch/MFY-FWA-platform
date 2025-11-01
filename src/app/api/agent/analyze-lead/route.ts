@@ -23,12 +23,32 @@ export async function POST(request: NextRequest) {
       ...lead.tier4Metrics,
     ];
 
-    // Use actual total billed if available, otherwise estimate
     const totalBilled = lead.totalBilled || (lead.claimCount * 500);
     const estimatedPeerTotal = lead.claimCount * 250;
     const estimatedOverpayment = totalBilled - estimatedPeerTotal;
 
-    // Build code context from actual data
+    // Build matched rules context
+    const matchedRulesContext = lead.matchedRules && lead.matchedRules.length > 0
+      ? lead.matchedRules.map((rule: any) => `
+**${rule.rule_id}**: ${rule.rule_name}
+- Severity: ${rule.severity}
+- Weight: ${rule.weight}
+- Confidence: ${(rule.confidence * 100).toFixed(0)}%
+- Explanation: ${rule.explanation}
+- Evidence: ${JSON.stringify(rule.evidence)}
+`).join('\n')
+      : 'No specific rules matched - pattern-based detection';
+
+    // Build rules table for prompt
+    const rulesTableData = lead.matchedRules && lead.matchedRules.length > 0
+      ? lead.matchedRules.map((rule: any) => ({
+          rule_id: rule.rule_id,
+          name: rule.rule_name,
+          detects: rule.explanation
+        }))
+      : [];
+
+    // Build code context
     let codeContext = '';
     if (lead.topCodes && lead.topCodes.length > 0) {
       codeContext = lead.topCodes.map((code: any) => {
@@ -47,15 +67,13 @@ Avg/claim: $${avgAmount.toFixed(2)}
 Round-$ %: ${roundPct.toFixed(0)}%
 ${mod59Pct > 0 ? `Modifier-59 %: ${mod59Pct.toFixed(0)}%` : ''}`;
       }).join('\n---');
-    } else {
-      codeContext = 'Code-level data not available';
     }
 
     const patternDetails = allMetrics.map((m: any, i: number) => 
       `${i + 1}. ${m.metric}: ${m.description || m.value || 'detected'}`
     ).join('\n');
 
-    const prompt = `Write a fraud investigation report using TABLES and BULLETS.
+    const prompt = `You are a healthcare fraud investigator. Write a concise, table-based report.
 
 PROVIDER: ${lead.provider_id}
 RISK: ${lead.priority}
@@ -65,64 +83,79 @@ TOTAL BILLED: $${totalBilled.toLocaleString()}
 OVERPAYMENT: ~$${estimatedOverpayment.toLocaleString()}
 
 TIER SCORES:
-T1=${lead.tier1Score} (${lead.tier1Metrics.length} violations)
-T2=${lead.tier2Score} (${lead.tier2Metrics.length} violations)
-T3=${lead.tier3Score} (${lead.tier3Metrics.length} patterns)
-T4=${lead.tier4Score} (${lead.tier4Metrics.length} trends)
+T1=${lead.tier1Score} T2=${lead.tier2Score} T3=${lead.tier3Score} T4=${lead.tier4Score}
 
-ACTUAL CPT/HCPCS CODES FROM DATA:
+FWA RULES MATCHED:
+${matchedRulesContext}
+
+ACTUAL CPT/HCPCS CODES:
 ${codeContext}
 
-PATTERNS DETECTED:
+PATTERNS:
 ${patternDetails}
 
 FRAUD INDICATORS:
-${lead.hasRoundNumbers ? '⚠️ Round-number clustering detected' : ''}
-${lead.hasModifier59 ? '⚠️ Modifier-59 overuse detected' : ''}
-${lead.hasDailyPattern ? '⚠️ Daily consecutive billing detected' : ''}
+${lead.hasRoundNumbers ? '⚠️ Round-number clustering' : ''}
+${lead.hasModifier59 ? '⚠️ Modifier-59 overuse' : ''}
+${lead.hasDailyPattern ? '⚠️ Daily consecutive billing' : ''}
 
-OUTPUT FORMAT (max 180 words):
+CRITICAL INSTRUCTIONS:
+1. START with a "Rule Anomalies" table showing matched rules
+2. Use actual rule IDs, names, and what they detect
+3. After the table, provide 2-3 sentence summary
+4. Then show comparative analysis table
+5. Reference rule IDs throughout
+6. Be forensically specific with evidence
+
+OUTPUT FORMAT (max 250 words):
 
 ## Provider: ${lead.provider_id} | ${lead.priority} RISK | Score: ${lead.overallScore.toFixed(1)}/100
 
-### SUMMARY
-[2-3 sentences using ACTUAL codes from above. Include specific code numbers, exact amounts, and overpayment.]
+### RULE ANOMALIES
 
-### COMPARATIVE ANALYSIS
-| Metric | Provider | Peer | Deviation |
-|--------|----------|------|-----------|
-| Claims/month | ${(lead.claimCount / 3).toFixed(0)} | 15 | +${((lead.claimCount / 3 / 15 - 1) * 100).toFixed(0)}% |
-| ${lead.hasRoundNumbers ? 'Round-$ %' : 'Avg billed'} | ${lead.hasRoundNumbers ? '85%' : '$' + (totalBilled / lead.claimCount).toFixed(0)} | ${lead.hasRoundNumbers ? '12%' : '$250'} | ${lead.hasRoundNumbers ? '+73pp' : '+' + ((totalBilled / lead.claimCount / 250 - 1) * 100).toFixed(0) + '%'} |
-| Total flagged | $${totalBilled.toLocaleString()} | $${estimatedPeerTotal.toLocaleString()} | +${((totalBilled / estimatedPeerTotal - 1) * 100).toFixed(0)}% |
-
-### FLAGGED CODES
-${lead.topCodes && lead.topCodes.length > 0 ? 
-  '[Use the ACTUAL codes from data above]' : 
-  '[Codes unavailable - pattern-based analysis]'}
-
-${lead.topCodes ? lead.topCodes.slice(0, 3).map((c: any) => `
-- **${c.code}** - ${c.description}
-  - ${c.count} claims × $${(c.totalBilled / c.count).toFixed(0)} = $${c.totalBilled.toLocaleString()}
-  - Pattern: [describe based on metrics]
-  - Normal: [peer baseline]`).join('\n') : 
-`
-- **Pattern 1**: ${allMetrics[0]?.metric || 'Unknown'}
-  - ${lead.claimCount} claims total
-  - Pattern: ${allMetrics[0]?.description || 'Detected anomaly'}
+${rulesTableData.length > 0 ? `
+| Rule ID | Name | What It Detects |
+|---------|------|-----------------|
+${rulesTableData.map(r => `| ${r.rule_id} | ${r.name} | ${r.detects} |`).join('\n')}
+` : `
+| Rule ID | Name | What It Detects |
+|---------|------|-----------------|
+| Pattern-based | General Anomaly Detection | Unusual billing patterns detected through statistical analysis |
 `}
 
-### RED FLAGS
-${allMetrics.slice(0, 4).map((m: any) => `• ${m.metric}: ${m.description || m.value}`).join('\n')}
+### SUMMARY
+[2-3 sentences explaining the fraud scheme. Reference rule IDs from table above. Include specific codes and dollar amounts.]
 
-### ACTION
-${lead.priority === 'HIGH' ? '🔴 Prepayment hold + request all records' : 
-  lead.priority === 'MEDIUM' ? '🟡 Request records for top 20 claims' :
-  '🟢 Monitor weekly for 60 days'}
-**Priority ${lead.priority === 'HIGH' ? '1' : lead.priority === 'MEDIUM' ? '2' : '3'}**`;
+### COMPARATIVE ANALYSIS
+| Metric | Provider | Peer Baseline | Deviation | Rule |
+|--------|----------|---------------|-----------|------|
+| [metric] | [value] | [baseline] | [+X%] | [Rule ID] |
+| [metric] | [value] | [baseline] | [+X%] | [Rule ID] |
+| Total flagged | $${totalBilled.toLocaleString()} | $${estimatedPeerTotal.toLocaleString()} | +${((totalBilled / estimatedPeerTotal - 1) * 100).toFixed(0)}% | Combined |
+
+### FLAGGED CODES
+[Use actual codes from data above]
+
+- **[CODE]** - [Description]
+  - [X] claims × $[Y] avg = $[Z] total
+  - Issue: [specific problem tied to rule]
+  - Baseline: [peer comparison]
+
+### INVESTIGATION PRIORITY
+${lead.priority === 'HIGH' ? '🔴 **IMMEDIATE ACTION REQUIRED**' : 
+  lead.priority === 'MEDIUM' ? '🟡 **ESCALATED REVIEW**' :
+  '🟢 **ROUTINE MONITORING**'}
+
+**Next Steps:**
+${lead.priority === 'HIGH' ? '1. Prepayment hold\n2. Request all medical records\n3. Site visit within 30 days' : 
+  lead.priority === 'MEDIUM' ? '1. Request sample of 20 claims\n2. Review documentation\n3. 90-day monitoring' :
+  '1. Weekly monitoring\n2. Alert on volume increase\n3. Quarterly re-assessment'}
+
+**Estimated Overpayment:** $${estimatedOverpayment.toLocaleString()}`;
 
     const message = await anthropic.messages.create({
       model: 'claude-sonnet-4-20250514',
-      max_tokens: 650,
+      max_tokens: 800,
       temperature: 0.1,
       messages: [{ role: 'user', content: prompt }],
     });
@@ -130,7 +163,10 @@ ${lead.priority === 'HIGH' ? '🔴 Prepayment hold + request all records' :
     const content = message.content[0];
     const analysis = content.type === 'text' ? content.text : 'Analysis failed';
 
-    return NextResponse.json({ analysis });
+    return NextResponse.json({ 
+      analysis,
+      matchedRules: lead.matchedRules || []
+    });
   } catch (error: any) {
     console.error('Agent error:', error);
     return NextResponse.json({ error: error.message }, { status: 500 });
