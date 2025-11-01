@@ -8,6 +8,12 @@ const anthropic = new Anthropic({
 export const maxDuration = 30;
 export const dynamic = 'force-dynamic';
 
+interface RuleTableData {
+  rule_id: string;
+  name: string;
+  detects: string;
+}
+
 export async function POST(request: NextRequest) {
   try {
     const { lead } = await request.json();
@@ -40,7 +46,7 @@ export async function POST(request: NextRequest) {
       : 'No specific rules matched - pattern-based detection';
 
     // Build rules table for prompt
-    const rulesTableData = lead.matchedRules && lead.matchedRules.length > 0
+    const rulesTableData: RuleTableData[] = lead.matchedRules && lead.matchedRules.length > 0
       ? lead.matchedRules.map((rule: any) => ({
           rule_id: rule.rule_id,
           name: rule.rule_name,
@@ -116,7 +122,7 @@ OUTPUT FORMAT (max 250 words):
 ${rulesTableData.length > 0 ? `
 | Rule ID | Name | What It Detects |
 |---------|------|-----------------|
-${rulesTableData.map(r => `| ${r.rule_id} | ${r.name} | ${r.detects} |`).join('\n')}
+${rulesTableData.map((r: RuleTableData) => `| ${r.rule_id} | ${r.name} | ${r.detects} |`).join('\n')}
 ` : `
 | Rule ID | Name | What It Detects |
 |---------|------|-----------------|
