@@ -1,0 +1,33 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = "file:./dev.db"
+}
+
+model Project {
+  id            String   @id @default(cuid())
+  name          String
+  fileName      String
+  fileSize      Int
+  datasetHash   String
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  // Stats
+  totalClaims      Int
+  totalProviders   Int
+  leadCount        Int
+  highPriorityCount Int
+  mediumPriorityCount Int
+  watchlistCount   Int
+  qualityScore     Float
+  
+  // Stored data (JSON)
+  claimsData       String  // JSON string of claims
+  leadsData        String  // JSON string of detection results
+  
+  @@index([createdAt])
+}
