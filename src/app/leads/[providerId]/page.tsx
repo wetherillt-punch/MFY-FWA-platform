@@ -4,8 +4,6 @@ import { useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import { ArrowLeft, AlertTriangle, TrendingUp, Activity, Sparkles, Loader2, Info } from 'lucide-react'
-import ReactMarkdown from 'react-markdown'
-import remarkGfm from 'remark-gfm'
 
 export default function LeadDetailPage() {
   const params = useParams()
@@ -51,7 +49,7 @@ export default function LeadDetailPage() {
     return (
       <div className="max-w-7xl mx-auto px-4 py-8">
         <div className="text-center">
-          <p className="text-gray-500">Lead not found. Please go back to dashboard and click on a provider.</p>
+          <p className="text-gray-500">Lead not found.</p>
           <Link href="/" className="text-blue-600 hover:text-blue-800 mt-4 inline-block">
             ← Back to Dashboard
           </Link>
@@ -68,46 +66,15 @@ export default function LeadDetailPage() {
   ]
 
   const tierDescriptions = [
-    {
-      tier: 1,
-      score: leadData.tier1Score,
-      title: "Obvious Red Flags",
-      description: "Clear violations like duplicate claims, impossible billing patterns, or extreme round-dollar amounts",
-      icon: "🚨",
-      severity: "Critical"
-    },
-    {
-      tier: 2,
-      score: leadData.tier2Score,
-      title: "Statistical Outliers",
-      description: "Unusual patterns compared to peers - billing amounts or frequencies that don't match expected distributions",
-      icon: "📊",
-      severity: "High"
-    },
-    {
-      tier: 3,
-      score: leadData.tier3Score,
-      title: "Suspicious Patterns",
-      description: "Repeated behaviors like always billing the same amounts, unusually high charges, or template-style billing",
-      icon: "🔍",
-      severity: "Medium"
-    },
-    {
-      tier: 4,
-      score: leadData.tier4Score,
-      title: "Emerging Trends",
-      description: "Early warning signs - sudden changes in billing habits or slowly developing concerning patterns",
-      icon: "📈",
-      severity: "Watch"
-    }
+    { tier: 1, score: leadData.tier1Score, title: "Obvious Red Flags", description: "Clear violations", icon: "🚨", severity: "Critical" },
+    { tier: 2, score: leadData.tier2Score, title: "Statistical Outliers", description: "Unusual vs peers", icon: "📊", severity: "High" },
+    { tier: 3, score: leadData.tier3Score, title: "Suspicious Patterns", description: "Template billing", icon: "🔍", severity: "Medium" },
+    { tier: 4, score: leadData.tier4Score, title: "Emerging Trends", description: "Early warnings", icon: "📈", severity: "Watch" }
   ]
 
   return (
     <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      <Link
-        href="/"
-        className="inline-flex items-center text-blue-600 hover:text-blue-800 mb-6"
-      >
+      <Link href="/" className="inline-flex items-center text-blue-600 hover:text-blue-800 mb-6">
         <ArrowLeft className="w-4 h-4 mr-2" />
         Back to Dashboard
       </Link>
@@ -118,15 +85,11 @@ export default function LeadDetailPage() {
             <h1 className="text-3xl font-bold text-gray-900">Provider {leadData.provider_id}</h1>
             <p className="text-gray-500 mt-1">From: {leadData.fileName}</p>
           </div>
-          <span
-            className={`px-4 py-2 text-sm font-semibold rounded-full ${
-              leadData.priority === 'HIGH'
-                ? 'bg-red-100 text-red-800'
-                : leadData.priority === 'MEDIUM'
-                ? 'bg-yellow-100 text-yellow-800'
-                : 'bg-gray-100 text-gray-800'
-            }`}
-          >
+          <span className={`px-4 py-2 text-sm font-semibold rounded-full ${
+              leadData.priority === 'HIGH' ? 'bg-red-100 text-red-800' :
+              leadData.priority === 'MEDIUM' ? 'bg-yellow-100 text-yellow-800' :
+              'bg-gray-100 text-gray-800'
+            }`}>
             {leadData.priority} PRIORITY
           </span>
         </div>
@@ -137,9 +100,7 @@ export default function LeadDetailPage() {
           <div>
             <div className="text-sm font-medium text-gray-600 mb-1">Overall FWA Score</div>
             <div className="text-5xl font-bold text-red-600">{leadData.overallScore.toFixed(1)}</div>
-            <p className="text-sm text-gray-600 mt-2">
-              Combined score from all detection tiers
-            </p>
+            <p className="text-sm text-gray-600 mt-2">Combined score</p>
           </div>
           <AlertTriangle className="w-16 h-16 text-red-400" />
         </div>
@@ -151,41 +112,25 @@ export default function LeadDetailPage() {
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {tierDescriptions.map((tier) => (
-              <div
-                key={tier.tier}
-                className={`bg-white rounded-lg p-4 border-2 ${
-                  tier.score > 0 ? 'border-red-300 shadow-md' : 'border-gray-200'
-                }`}
-              >
+              <div key={tier.tier} className={`bg-white rounded-lg p-4 border-2 ${tier.score > 0 ? 'border-red-300 shadow-md' : 'border-gray-200'}`}>
                 <div className="flex items-start justify-between mb-2">
                   <div className="flex items-center">
                     <span className="text-2xl mr-2">{tier.icon}</span>
                     <div>
-                      <div className="font-semibold text-gray-900">
-                        Tier {tier.tier}: {tier.title}
-                      </div>
+                      <div className="font-semibold text-gray-900">Tier {tier.tier}: {tier.title}</div>
                       <span className={`text-xs px-2 py-0.5 rounded-full ${
                         tier.severity === 'Critical' ? 'bg-red-100 text-red-700' :
                         tier.severity === 'High' ? 'bg-orange-100 text-orange-700' :
                         tier.severity === 'Medium' ? 'bg-yellow-100 text-yellow-700' :
                         'bg-gray-100 text-gray-700'
-                      }`}>
-                        {tier.severity}
-                      </span>
+                      }`}>{tier.severity}</span>
                     </div>
                   </div>
                   <div className={`text-2xl font-bold ${
-                    tier.score > 70 ? 'text-red-600' :
-                    tier.score > 40 ? 'text-orange-600' :
-                    tier.score > 0 ? 'text-yellow-600' :
-                    'text-gray-400'
-                  }`}>
-                    {tier.score.toFixed(0)}
-                  </div>
+                    tier.score > 70 ? 'text-red-600' : tier.score > 40 ? 'text-orange-600' : tier.score > 0 ? 'text-yellow-600' : 'text-gray-400'
+                  }`}>{tier.score.toFixed(0)}</div>
                 </div>
-                <p className="text-xs text-gray-600 leading-relaxed">
-                  {tier.description}
-                </p>
+                <p className="text-xs text-gray-600">{tier.description}</p>
               </div>
             ))}
           </div>
@@ -204,11 +149,11 @@ export default function LeadDetailPage() {
 
         <div className="bg-white rounded-lg shadow p-6">
           <div className="flex items-center justify-between mb-2">
-            <div className="text-sm font-medium text-gray-500">Patterns Detected</div>
+            <div className="text-sm font-medium text-gray-500">Patterns</div>
             <TrendingUp className="w-5 h-5 text-orange-400" />
           </div>
           <div className="text-3xl font-bold text-orange-600">{allMetrics.length}</div>
-          <p className="text-xs text-gray-500 mt-1">Anomaly patterns</p>
+          <p className="text-xs text-gray-500 mt-1">Anomalies</p>
         </div>
 
         <div className="bg-white rounded-lg shadow p-6">
@@ -218,9 +163,7 @@ export default function LeadDetailPage() {
           </div>
           <div className="text-2xl font-bold text-red-600">{leadData.priority}</div>
           <p className="text-xs text-gray-500 mt-1">
-            {leadData.priority === 'HIGH' ? 'Immediate investigation' :
-             leadData.priority === 'MEDIUM' ? 'Surveillance warranted' :
-             'Monitor for escalation'}
+            {leadData.priority === 'HIGH' ? 'Immediate investigation' : leadData.priority === 'MEDIUM' ? 'Surveillance warranted' : 'Monitor'}
           </p>
         </div>
       </div>
@@ -235,59 +178,22 @@ export default function LeadDetailPage() {
             
             {!agentAnalysis ? (
               <>
-                <p className="text-gray-600 mb-4">
-                  Get detailed analysis with specific CPT codes, dollar amounts, and investigation steps.
-                </p>
+                <p className="text-gray-600 mb-4">Detailed analysis with CPT codes and investigation steps.</p>
                 <button
                   onClick={analyzeWithAI}
                   disabled={isAnalyzing}
                   className="inline-flex items-center px-6 py-3 bg-purple-600 text-white font-medium rounded-lg hover:bg-purple-700 disabled:bg-gray-400 transition-colors"
                 >
                   {isAnalyzing ? (
-                    <>
-                      <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-                      Analyzing...
-                    </>
+                    <><Loader2 className="w-5 h-5 mr-2 animate-spin" />Analyzing...</>
                   ) : (
-                    <>
-                      <Sparkles className="w-5 h-5 mr-2" />
-                      Generate AI Analysis
-                    </>
+                    <><Sparkles className="w-5 h-5 mr-2" />Generate AI Analysis</>
                   )}
                 </button>
               </>
             ) : (
               <div className="bg-white rounded-lg p-8 border border-purple-200">
-                <div className="ai-analysis-content">
-                  <ReactMarkdown 
-                    remarkPlugins={[remarkGfm]}
-                    components={{
-                      h2: ({node, ...props}) => <h2 className="text-2xl font-bold text-gray-900 mb-6 pb-3 border-b-2 border-gray-200" {...props} />,
-                      h3: ({node, ...props}) => <h3 className="text-xl font-bold text-gray-900 mt-8 mb-4" {...props} />,
-                      p: ({node, ...props}) => <p className="text-gray-700 leading-relaxed mb-4" {...props} />,
-                      ul: ({node, ...props}) => <ul className="list-disc ml-6 mb-6 space-y-2 text-gray-700" {...props} />,
-                      ol: ({node, ...props}) => <ol className="list-decimal ml-6 mb-6 space-y-2 text-gray-700" {...props} />,
-                      li: ({node, ...props}) => <li className="leading-relaxed" {...props} />,
-                      strong: ({node, ...props}) => <strong className="font-semibold text-gray-900" {...props} />,
-                      table: ({node, ...props}) => (
-                        <div className="overflow-x-auto my-6">
-                          <table className="min-w-full border-collapse border border-gray-300 shadow-sm" {...props} />
-                        </div>
-                      ),
-                      thead: ({node, ...props}) => <thead className="bg-gradient-to-r from-gray-100 to-gray-50" {...props} />,
-                      tbody: ({node, ...props}) => <tbody className="divide-y divide-gray-200" {...props} />,
-                      tr: ({node, ...props}) => <tr className="hover:bg-gray-50 transition-colors" {...props} />,
-                      th: ({node, ...props}) => (
-                        <th className="border border-gray-300 px-6 py-3 text-left text-xs font-bold text-gray-900 uppercase tracking-wider" {...props} />
-                      ),
-                      td: ({node, ...props}) => (
-                        <td className="border border-gray-300 px-6 py-4 text-sm text-gray-700" {...props} />
-                      ),
-                    }}
-                  >
-                    {agentAnalysis}
-                  </ReactMarkdown>
-                </div>
+                <div dangerouslySetInnerHTML={{ __html: agentAnalysis }} />
               </div>
             )}
           </div>
