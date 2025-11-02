@@ -1,125 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import * as XLSX from 'xlsx';
-import { ruleMatcher } from '@/lib/fwa-rules/matcher';
-
-export const maxDuration = 60;
-export const dynamic = 'force-dynamic';
-
-async function parseExcelFile(file: File) {
-  const arrayBuffer = await file.arrayBuffer();
-  const workbook = XLSX.read(arrayBuffer);
-  const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
-  const data = XLSX.utils.sheet_to_json(firstSheet);
-  return data;
-}
-
-function extractProviderCodeStats(data: any[], providerId: string) {
-  const providerClaims = data.filter((c: any) => c.provider_id === providerId);
-  
-  const codeMap: any = {};
-  
-  providerClaims.forEach((claim: any) => {
-    const code = claim.cpt_hcpcs || claim.cpt_code || claim.procedure_code || 'UNKNOWN';
-    
-    if (!codeMap[code]) {
-      codeMap[code] = {
-        code,
-        description: claim.service_description || 'No description',
-        count: 0,
-        totalBilled: 0,
-        amounts: [],
-        dates: [],
-        modifiers: []
-      };
-    }
-    
-    codeMap[code].count++;
-    codeMap[code].totalBilled += parseFloat(claim.billed_amount || 0);
-    codeMap[code].amounts.push(parseFloat(claim.billed_amount || 0));
-    if (claim.service_date) codeMap[code].dates.push(claim.service_date);
-    if (claim.modifier) codeMap[code].modifiers.push(claim.modifier);
-  });
-  
-  return Object.values(codeMap)
-    .sort((a: any, b: any) => b.totalBilled - a.totalBilled)
-    .slice(0, 5);
-}
-
-function detectFWA(data: any[]) {
-  const providerMap: any = {};
-  
-  data.forEach((claim: any) => {
-    const pid = claim.provider_id;
-    if (!providerMap[pid]) {
-      providerMap[pid] = [];
-    }
-    providerMap[pid].push(claim);
-  });
-  
-  const leads: any[] = [];
-  
-  Object.keys(providerMap).forEach(providerId => {
-    const claims = providerMap[providerId];
-    const amounts = claims.map((c: any) => parseFloat(c.billed_amount || 0));
-    
-    const roundNumbers = amounts.filter((a: number) => a % 100 === 0).length;
-    const roundPct = (roundNumbers / amounts.length) * 100;
-    
-    let score = 0;
-    const metrics: any[] = [];
-    
-    if (roundPct > 30) {
-      score += 60;
-      metrics.push({
-        metric: 'Round Number Clustering',
-        description: `${roundPct.toFixed(0)}% of claims are round-dollar amounts`,
-        tier: 3
-      });
-    }
-    
-    if (claims.length > 100) {
-      score += 40;
-      metrics.push({
-        metric: 'High Volume',
-        description: `${claims.length} claims (high frequency)`,
-        tier: 1
-      });
-    }
-    
-    if (score > 40) {
-      leads.push({
-        provider_id: providerId,
-        overallScore: score,
-        priority: score >= 70 ? 'HIGH' : score >= 50 ? 'MEDIUM' : 'WATCHLIST',
-        claimCount: claims.length,
-        tier1Score: claims.length > 100 ? 100 : 0,
-        tier2Score: 0,
-        tier3Score: roundPct > 30 ? 100 : 0,
-        tier4Score: 0,
-        tier1Metrics: claims.length > 100 ? [{
-          metric: 'High Volume',
-          description: `${claims.length} claims`,
-          tier: 1
-        }] : [],
-        tier2Metrics: [],
-        tier3Metrics: roundPct > 30 ? [{
-          metric: 'Round Number Clustering',
-          description: `${roundPct.toFixed(0)}% round amounts`,
-          tier: 3
-        }] : [],
-        tier4Metrics: []
-      });
-    }
-  });
-  
-  return {
-    leadCount: leads.length,
-    highPriorityCount: leads.filter(l => l.priority === 'HIGH').length,
-    mediumPriorityCount: leads.filter(l => l.priority === 'MEDIUM').length,
-    watchlistCount: leads.filter(l => l.priority === 'WATCHLIST').length,
-    leads
-  };
-}
+import { runComprehensiveDetection } from '@/lib/detection/orchestrator';
+import { Claim } from '@/types/detection';
 
 export async function POST(request: NextRequest) {
   try {
@@ -130,82 +12,92 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'No file provided' }, { status: 400 });
     }
 
-    const data = await parseExcelFile(file);
-    const detectionResult = detectFWA(data);
+    // Read file
+    const arrayBuffer = await file.arrayBuffer();
+    const buffer = Buffer.from(arrayBuffer);
+    const workbook = XLSX.read(buffer, { type: 'buffer' });
+    const sheetName = workbook.SheetNames[0];
+    const worksheet = workbook.Sheets[sheetName];
+    const rawData = XLSX.utils.sheet_to_json(worksheet);
 
-    const enrichedLeads = detectionResult.leads.map((lead: any) => {
-      const topCodes = extractProviderCodeStats(data, lead.provider_id);
-      const totalBilled = topCodes.reduce((sum: number, c: any) => sum + c.totalBilled, 0);
-      
-      const hasRoundNumbers = topCodes.some((c: any) => {
-        const roundCount = c.amounts.filter((amt: number) => amt % 100 === 0).length;
-        return (roundCount / c.amounts.length) > 0.5;
-      });
-      
-      const hasModifier59 = topCodes.some((c: any) => {
-        const mod59Count = c.modifiers.filter((m: any) => String(m) === '59').length;
-        return (mod59Count / c.count) > 0.5;
-      });
-      
-      const hasDailyPattern = topCodes.some((c: any) => {
-        if (c.dates.length < 5) return false;
-        const sortedDates = [...c.dates].sort();
-        let consecutiveDays = 0;
-        for (let i = 1; i < sortedDates.length; i++) {
-          const date1 = new Date(sortedDates[i - 1]);
-          const date2 = new Date(sortedDates[i]);
-          const diffDays = (date2.getTime() - date1.getTime()) / (1000 * 60 * 60 * 24);
-          if (diffDays === 1) consecutiveDays++;
-        }
-        return consecutiveDays >= 5;
-      });
+    // Parse and validate claims
+    const claims: Claim[] = rawData.map((row: any) => ({
+      claim_id: String(row.claim_id || row.CLAIM_ID || ''),
+      provider_id: String(row.provider_id || row.PROVIDER_ID || ''),
+      member_id: String(row.member_id || row.MEMBER_ID || ''),
+      service_date: String(row.service_date || row.SERVICE_DATE || ''),
+      billed_amount: String(row.billed_amount || row.BILLED_AMOUNT || '0'),
+      paid_amount: String(row.paid_amount || row.PAID_AMOUNT || ''),
+      cpt_hcpcs: String(row.cpt_hcpcs || row.CPT_HCPCS || row.code || ''),
+      cpt_description: String(row.cpt_description || row.CPT_DESCRIPTION || row.description || ''),
+      modifiers: String(row.modifiers || row.MODIFIERS || ''),
+      place_of_service: String(row.place_of_service || row.PLACE_OF_SERVICE || ''),
+      diagnosis_code: String(row.diagnosis_code || row.DIAGNOSIS_CODE || '')
+    }));
 
-      // NEW: Match FWA rules
-      const matchedRules = ruleMatcher.matchRules({
-        ...lead,
-        topCodes,
-        totalBilled,
-        hasRoundNumbers,
-        hasModifier59,
-        hasDailyPattern
-      });
+    // Validate required fields
+    const validClaims = claims.filter(c => 
+      c.claim_id && c.provider_id && c.service_date && c.billed_amount
+    );
 
-      return {
-        ...lead,
-        topCodes,
-        totalBilled,
-        hasRoundNumbers,
-        hasModifier59,
-        hasDailyPattern,
-        matchedRules // Add matched rules to lead data
-      };
+    if (validClaims.length === 0) {
+      return NextResponse.json({ 
+        error: 'No valid claims found. Required fields: claim_id, provider_id, service_date, billed_amount' 
+      }, { status: 400 });
+    }
+
+    console.log(`✅ Parsed ${validClaims.length} valid claims`);
+
+    // Get unique providers
+    const uniqueProviders = [...new Set(validClaims.map(c => c.provider_id))];
+    console.log(`📊 Analyzing ${uniqueProviders.length} providers`);
+
+    // Run comprehensive detection for each provider
+    const results = uniqueProviders.map(providerId => {
+      console.log(`🔍 Detecting FWA for provider ${providerId}...`);
+      return runComprehensiveDetection(validClaims, providerId, uniqueProviders);
     });
 
-    const uniqueProviders = new Set(data.map((d: any) => d.provider_id)).size;
+    // Filter to only providers with issues (score > 0)
+    const leads = results
+      .filter(r => r.overallScore > 0)
+      .sort((a, b) => b.overallScore - a.overallScore);
+
+    console.log(`🚨 Found ${leads.length} leads requiring attention`);
+
+    // Calculate summary statistics
+    const highPriority = leads.filter(l => l.priority === 'HIGH').length;
+    const mediumPriority = leads.filter(l => l.priority === 'MEDIUM').length;
+    const watchlist = leads.filter(l => l.priority === 'WATCHLIST').length;
+
+    const totalBilled = validClaims.reduce((sum, c) => 
+      sum + parseFloat(c.billed_amount || '0'), 0
+    );
+
+    const totalFlagged = leads.reduce((sum, l) => sum + l.totalBilled, 0);
+
+    console.log(`📈 Summary: ${highPriority} HIGH, ${mediumPriority} MEDIUM, ${watchlist} WATCHLIST`);
+    console.log(`💰 Total billed: $${totalBilled.toLocaleString()}, Flagged: $${totalFlagged.toLocaleString()}`);
 
     return NextResponse.json({
       success: true,
       fileName: file.name,
-      parseResult: {
-        stats: {
-          totalRows: data.length,
-          uniqueProviders
-        }
-      },
-      detection: {
-        ...detectionResult,
-        leads: enrichedLeads
-      },
-      qualityReport: {
-        qualityScore: 95
-      }
+      totalClaims: validClaims.length,
+      totalProviders: uniqueProviders.length,
+      leadsDetected: leads.length,
+      highPriority,
+      mediumPriority,
+      watchlist,
+      totalBilled,
+      totalFlagged,
+      leads,
+      analysisDate: new Date().toISOString()
     });
 
   } catch (error: any) {
     console.error('Upload error:', error);
-    return NextResponse.json(
-      { error: error.message || 'Upload failed' },
-      { status: 500 }
-    );
+    return NextResponse.json({ 
+      error: error.message || 'Failed to process file' 
+    }, { status: 500 });
   }
 }

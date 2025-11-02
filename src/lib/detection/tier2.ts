@@ -1,308 +1,175 @@
-/**
- * Tier 2 - Statistical Anomaly Detection
- * 
- * - Burstiness and spikes (rolling z-scores)
- * - Benford's Law deviation
- * - Gini/HHI concentration
- * - Peer-relative outliers
- */
+import { Claim } from '@/types/detection';
 
-import { ClaimWithHash, AnomalyMetric } from '@/types';
-
-// ============================================================================
-// STATISTICAL UTILITIES
-// ============================================================================
-
-function mean(values: number[]): number {
-  if (values.length === 0) return 0;
-  return values.reduce((sum, v) => sum + v, 0) / values.length;
+export interface Tier2Result {
+  score: number;
+  metrics: Array<{
+    metric: string;
+    description: string;
+    value: any;
+    tier: number;
+  }>;
 }
 
-function stdDev(values: number[]): number {
-  if (values.length < 2) return 0;
-  const avg = mean(values);
-  const squareDiffs = values.map(v => Math.pow(v - avg, 2));
-  const avgSquareDiff = mean(squareDiffs);
-  return Math.sqrt(avgSquareDiff);
-}
-
-function median(values: number[]): number {
-  if (values.length === 0) return 0;
-  const sorted = [...values].sort((a, b) => a - b);
-  const mid = Math.floor(sorted.length / 2);
-  return sorted.length % 2 === 0
-    ? (sorted[mid - 1] + sorted[mid]) / 2
-    : sorted[mid];
-}
-
-function percentile(values: number[], p: number): number {
-  if (values.length === 0) return 0;
-  const sorted = [...values].sort((a, b) => a - b);
-  const index = Math.ceil((p / 100) * sorted.length) - 1;
-  return sorted[Math.max(0, index)];
-}
-
-// ============================================================================
-// BURSTINESS DETECTION (Rolling Z-Scores)
-// ============================================================================
-
-export function detectBurstiness(
-  claims: ClaimWithHash[],
-  providerId: string,
-  zScoreThreshold: number = 3.0
-): AnomalyMetric | null {
+export function detectTier2(claims: Claim[], providerId: string, allProviders: string[]): Tier2Result {
   const providerClaims = claims.filter(c => c.provider_id === providerId);
-  
-  if (providerClaims.length < 30) return null; // Need meaningful window
-  
-  // Group by day
-  const dailyCounts = new Map<string, number>();
-  providerClaims.forEach(claim => {
-    const day = claim.service_date.toISOString().split('T')[0];
-    dailyCounts.set(day, (dailyCounts.get(day) || 0) + 1);
-  });
-  
-  const counts = Array.from(dailyCounts.values());
-  const avg = mean(counts);
-  const sd = stdDev(counts);
-  
-  if (sd === 0) return null; // No variance
-  
-  // Find max z-score
-  const maxZScore = Math.max(...counts.map(c => Math.abs((c - avg) / sd)));
-  
-  // Overdispersion ratio (variance / mean)
-  const overdispersion = sd * sd / avg;
-  
-  if (maxZScore > zScoreThreshold && overdispersion > 2.0) {
-    return {
-      metricName: 'Burstiness (Max Z-Score)',
-      providerValue: maxZScore,
-      baseline: 1.5,
-      peerPercentile: 95,
-      sampleN: providerClaims.length,
-      tier: 2,
-      anomalyTag: 'burstiness_spike',
-    };
+  const metrics: any[] = [];
+  let score = 0;
+
+  if (providerClaims.length < 30) {
+    return { score: 0, metrics: [] };
   }
+
+  // 1. BENFORD'S LAW ANALYSIS
+  const benfordResult = checkBenfordLaw(providerClaims);
+  if (benfordResult.violation && providerClaims.length >= 100) {
+    score += 70;
+    metrics.push({
+      metric: "Benford's Law Violation",
+      description: `First digit distribution deviates from expected (chi-square: ${benfordResult.chiSquare.toFixed(2)})`,
+      value: benfordResult.chiSquare.toFixed(2),
+      tier: 2
+    });
+  }
+
+  // 2. PEER OUTLIER ANALYSIS
+  const peerResult = compareToPeers(providerId, claims, allProviders);
+  if (peerResult.isOutlier) {
+    score += 80;
+    metrics.push({
+      metric: 'Peer Outlier',
+      description: `${peerResult.percentile}th percentile for ${peerResult.metric}`,
+      value: `${peerResult.percentile}th percentile`,
+      tier: 2
+    });
+  }
+
+  // 3. Z-SCORE SPIKE DETECTION
+  const spikeResult = detectSpikes(providerClaims);
+  if (spikeResult.hasSpike) {
+    score += 75;
+    metrics.push({
+      metric: 'Billing Spike',
+      description: `Unusual spike on ${spikeResult.spikeDate} (z-score: ${spikeResult.zScore.toFixed(2)})`,
+      value: `Z=${spikeResult.zScore.toFixed(2)}`,
+      tier: 2
+    });
+  }
+
+  // 4. CONCENTRATION INDEX
+  const gini = calculateGini(providerClaims);
+  if (gini > 0.7) {
+    score += 60;
+    metrics.push({
+      metric: 'High Concentration',
+      description: `Gini index ${gini.toFixed(2)} indicates repetitive billing`,
+      value: gini.toFixed(2),
+      tier: 2
+    });
+  }
+
+  return { score: Math.min(score, 100), metrics };
+}
+
+function checkBenfordLaw(claims: Claim[]): { violation: boolean; chiSquare: number; pValue: number } {
+  if (claims.length < 100) return { violation: false, chiSquare: 0, pValue: 1 };
+
+  const firstDigits = claims.map(c => {
+    const amount = parseFloat(c.billed_amount || '0');
+    return parseInt(amount.toString()[0]);
+  }).filter(d => d > 0 && d <= 9);
+
+  const observed = Array(9).fill(0);
+  firstDigits.forEach(d => observed[d - 1]++);
+
+  const expected = [30.1, 17.6, 12.5, 9.7, 7.9, 6.7, 5.8, 5.1, 4.6];
   
-  return null;
-}
-
-// ============================================================================
-// BENFORD'S LAW DETECTION
-// ============================================================================
-
-const BENFORD_EXPECTED = [
-  0.301, // Leading digit 1
-  0.176, // Leading digit 2
-  0.125, // Leading digit 3
-  0.097, // Leading digit 4
-  0.079, // Leading digit 5
-  0.067, // Leading digit 6
-  0.058, // Leading digit 7
-  0.051, // Leading digit 8
-  0.046, // Leading digit 9
-];
-
-function getLeadingDigit(amount: number): number {
-  const str = Math.abs(amount).toString();
-  const firstNonZero = str.replace(/^0+/, '')[0];
-  return parseInt(firstNonZero) || 0;
-}
-
-function chiSquareTest(observed: number[], expected: number[]): number {
   let chiSquare = 0;
-  for (let i = 0; i < observed.length; i++) {
-    if (expected[i] > 0) {
-      chiSquare += Math.pow(observed[i] - expected[i], 2) / expected[i];
+  for (let i = 0; i < 9; i++) {
+    const exp = (expected[i] / 100) * firstDigits.length;
+    if (exp > 0) {
+      chiSquare += Math.pow(observed[i] - exp, 2) / exp;
     }
   }
-  return chiSquare;
+
+  return {
+    violation: chiSquare > 15.507,
+    chiSquare,
+    pValue: chiSquare > 15.507 ? 0.01 : 0.5
+  };
 }
 
-export function detectBenfordDeviation(
-  claims: ClaimWithHash[],
-  providerId: string,
-  minSampleSize: number = 300,
-  pValueThreshold: number = 0.01
-): AnomalyMetric | null {
-  const providerClaims = claims.filter(c => c.provider_id === providerId);
+function compareToPeers(providerId: string, allClaims: Claim[], allProviders: string[]): any {
+  const providerClaims = allClaims.filter(c => c.provider_id === providerId);
   
-  if (providerClaims.length < minSampleSize) return null;
-  
-  // Count leading digits
-  const digitCounts = new Array(9).fill(0);
-  providerClaims.forEach(claim => {
-    const digit = getLeadingDigit(claim.billed_amount);
-    if (digit >= 1 && digit <= 9) {
-      digitCounts[digit - 1]++;
-    }
+  const providerMetrics = allProviders.map(pid => {
+    const claims = allClaims.filter(c => c.provider_id === pid);
+    if (claims.length === 0) return { providerId: pid, claimsPerMonth: 0 };
+    return {
+      providerId: pid,
+      claimsPerMonth: claims.length / 3
+    };
   });
-  
-  // Convert to proportions
-  const total = digitCounts.reduce((sum, c) => sum + c, 0);
-  if (total === 0) return null;
-  
-  const observed = digitCounts.map(c => c / total);
-  
-  // Chi-square test
-  const chiSquare = chiSquareTest(
-    observed.map(o => o * total),
-    BENFORD_EXPECTED.map(e => e * total)
-  );
-  
-  // Degrees of freedom = 8 (9 digits - 1)
-  // Critical value at p=0.01, df=8 is ~20.09
-  const criticalValue = 20.09;
-  
-  if (chiSquare > criticalValue) {
-    return {
-      metricName: 'Benford Deviation (Chi-Square)',
-      providerValue: chiSquare,
-      baseline: 8.0, // Expected chi-square
-      peerPercentile: 97,
-      pValue: pValueThreshold,
-      sampleN: total,
-      tier: 2,
-      anomalyTag: 'benford_deviation',
-    };
-  }
-  
-  return null;
+
+  const targetMetric = providerMetrics.find(m => m.providerId === providerId);
+  if (!targetMetric) return { isOutlier: false };
+
+  const sorted = providerMetrics.map(m => m.claimsPerMonth).sort((a, b) => a - b);
+  const percentile = (sorted.filter(v => v < targetMetric.claimsPerMonth).length / sorted.length) * 100;
+
+  return {
+    isOutlier: percentile > 95,
+    percentile: Math.round(percentile),
+    metric: 'Claims/month'
+  };
 }
 
-// ============================================================================
-// GINI/HHI CONCENTRATION
-// ============================================================================
+function detectSpikes(claims: Claim[]): any {
+  const dailyTotals = new Map<string, number>();
+  
+  claims.forEach(claim => {
+    const date = claim.service_date.split('T')[0];
+    const amount = parseFloat(claim.billed_amount || '0');
+    dailyTotals.set(date, (dailyTotals.get(date) || 0) + amount);
+  });
 
-function calculateGini(values: number[]): number {
-  if (values.length === 0) return 0;
+  const amounts = Array.from(dailyTotals.values());
+  if (amounts.length < 5) return { hasSpike: false };
+
+  const mean = amounts.reduce((a, b) => a + b, 0) / amounts.length;
+  const stdDev = Math.sqrt(amounts.reduce((sq, n) => sq + Math.pow(n - mean, 2), 0) / amounts.length);
+
+  const spikes = Array.from(dailyTotals.entries())
+    .map(([date, amount]) => ({
+      date,
+      amount,
+      zScore: stdDev > 0 ? (amount - mean) / stdDev : 0
+    }))
+    .filter(s => s.zScore > 3);
+
+  if (spikes.length > 0) {
+    const maxSpike = spikes[0];
+    return {
+      hasSpike: true,
+      spikeDate: maxSpike.date,
+      spikeAmount: maxSpike.amount.toFixed(0),
+      zScore: maxSpike.zScore
+    };
+  }
+
+  return { hasSpike: false };
+}
+
+function calculateGini(claims: Claim[]): number {
+  const amounts = claims.map(c => parseFloat(c.billed_amount || '0')).sort((a, b) => a - b);
+  const n = amounts.length;
+  const sum = amounts.reduce((a, b) => a + b, 0);
   
-  const sorted = [...values].sort((a, b) => a - b);
-  const n = sorted.length;
-  let sum = 0;
+  if (sum === 0) return 0;
   
+  let numerator = 0;
   for (let i = 0; i < n; i++) {
-    sum += (2 * (i + 1) - n - 1) * sorted[i];
+    numerator += (2 * (i + 1) - n - 1) * amounts[i];
   }
   
-  const totalSum = sorted.reduce((a, b) => a + b, 0);
-  return sum / (n * totalSum);
-}
-
-export function detectConcentration(
-  claims: ClaimWithHash[],
-  providerId: string
-): AnomalyMetric | null {
-  const providerClaims = claims.filter(c => c.provider_id === providerId);
-  
-  if (providerClaims.length < 20) return null;
-  
-  const amounts = providerClaims.map(c => c.billed_amount);
-  const gini = calculateGini(amounts);
-  
-  // High Gini (> 0.6) indicates concentration
-  if (gini > 0.6) {
-    return {
-      metricName: 'Gini Concentration Index',
-      providerValue: gini,
-      baseline: 0.35,
-      peerPercentile: 92,
-      sampleN: providerClaims.length,
-      tier: 2,
-      anomalyTag: 'high_concentration',
-    };
-  }
-  
-  return null;
-}
-
-// ============================================================================
-// PEER-RELATIVE OUTLIERS
-// ============================================================================
-
-export function detectPeerOutlier(
-  claims: ClaimWithHash[],
-  providerId: string,
-  allProviderIds: string[],
-  percentileThreshold: number = 2.5
-): AnomalyMetric | null {
-  const providerClaims = claims.filter(c => c.provider_id === providerId);
-  
-  if (providerClaims.length < 10) return null;
-  
-  // Calculate this provider's avg billed amount
-  const providerAvg = mean(providerClaims.map(c => c.billed_amount));
-  
-  // Calculate all providers' averages
-  const allAvgs = allProviderIds.map(pid => {
-    const pClaims = claims.filter(c => c.provider_id === pid);
-    if (pClaims.length === 0) return 0;
-    return mean(pClaims.map(c => c.billed_amount));
-  }).filter(a => a > 0);
-  
-  if (allAvgs.length < 20) return null; // Need peer group
-  
-  // Calculate percentile
-  const sorted = [...allAvgs].sort((a, b) => a - b);
-  const rank = sorted.filter(a => a <= providerAvg).length;
-  const peerPercentile = (rank / sorted.length) * 100;
-  
-  // Flag if in top percentileThreshold%
-  if (peerPercentile > (100 - percentileThreshold)) {
-    return {
-      metricName: 'Average Billed Amount (Peer Comparison)',
-      providerValue: providerAvg,
-      baseline: median(allAvgs),
-      peerPercentile: peerPercentile,
-      sampleN: providerClaims.length,
-      tier: 2,
-      anomalyTag: 'peer_outlier_high',
-    };
-  }
-  
-  return null;
-}
-
-// ============================================================================
-// TIER 2 AGGREGATOR
-// ============================================================================
-
-export function detectTier2Anomalies(
-  claims: ClaimWithHash[],
-  providerId: string,
-  allProviderIds: string[],
-  config: {
-    zScoreThreshold: number;
-    benfordMinSampleSize: number;
-    benfordPValueThreshold: number;
-    peerOutlierPercentile: number;
-  }
-): AnomalyMetric[] {
-  const results: AnomalyMetric[] = [];
-  
-  const burstiness = detectBurstiness(claims, providerId, config.zScoreThreshold);
-  if (burstiness) results.push(burstiness);
-  
-  const benford = detectBenfordDeviation(
-    claims,
-    providerId,
-    config.benfordMinSampleSize,
-    config.benfordPValueThreshold
-  );
-  if (benford) results.push(benford);
-  
-  const concentration = detectConcentration(claims, providerId);
-  if (concentration) results.push(concentration);
-  
-  const peerOutlier = detectPeerOutlier(
-    claims,
-    providerId,
-    allProviderIds,
-    config.peerOutlierPercentile
-  );
-  if (peerOutlier) results.push(peerOutlier);
-  
-  return results;
+  return numerator / (n * sum);
 }

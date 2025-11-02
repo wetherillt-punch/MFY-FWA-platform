@@ -1,229 +1,116 @@
-/**
- * Tier 3 - Behavioral Anomaly Detection
- * 
- * - Claim-splitting patterns
- * - Anchoring (identical amounts repeated)
- * - Change-points (step-ups)
- */
+import { Claim } from '@/types/detection';
 
-import { ClaimWithHash, AnomalyMetric } from '@/types';
-
-// ============================================================================
-// CLAIM-SPLITTING DETECTION
-// ============================================================================
-
-export function detectClaimSplitting(
-  claims: ClaimWithHash[],
-  providerId: string,
-  windowDays: number = 7
-): AnomalyMetric | null {
-  const providerClaims = claims.filter(c => c.provider_id === providerId)
-    .sort((a, b) => a.service_date.getTime() - b.service_date.getTime());
-  
-  if (providerClaims.length < 10) return null;
-  
-  let splittingCount = 0;
-  const windowMs = windowDays * 24 * 60 * 60 * 1000;
-  
-  // Look for patterns: many small claims that sum to near a round number
-  for (let i = 0; i < providerClaims.length - 2; i++) {
-    const claim1 = providerClaims[i];
-    const nearbywindow = [];
-    
-    // Find claims within window
-    for (let j = i + 1; j < providerClaims.length; j++) {
-      const timeDiff = providerClaims[j].service_date.getTime() - claim1.service_date.getTime();
-      if (timeDiff > windowMs) break;
-      nearbywindow.push(providerClaims[j]);
-    }
-    
-    if (nearbywindow.length >= 2) {
-      // Check if sum approximates a round number
-      const sum = claim1.billed_amount + nearbywindow.reduce((s, c) => s + c.billed_amount, 0);
-      const roundedSum = Math.round(sum / 100) * 100;
-      const diff = Math.abs(sum - roundedSum);
-      
-      // If sum is within $5 of a round hundred
-      if (diff < 5 && sum > 100) {
-        splittingCount++;
-      }
-    }
-  }
-  
-  const splittingRate = splittingCount / providerClaims.length;
-  
-  if (splittingRate > 0.1) { // More than 10% of claims appear to be splits
-    return {
-      metricName: 'Claim Splitting Pattern Rate',
-      providerValue: splittingRate * 100,
-      baseline: 2.0,
-      peerPercentile: 96,
-      sampleN: providerClaims.length,
-      tier: 3,
-      anomalyTag: 'claim_splitting',
-    };
-  }
-  
-  return null;
+export interface Tier3Result {
+  score: number;
+  metrics: Array<{
+    metric: string;
+    description: string;
+    value: any;
+    tier: number;
+  }>;
 }
 
-// ============================================================================
-// ANCHORING DETECTION (Repeated Identical Amounts)
-// ============================================================================
-
-export function detectAnchoring(
-  claims: ClaimWithHash[],
-  providerId: string,
-  minRepeats: number = 10
-): AnomalyMetric | null {
+export function detectTier3(claims: Claim[], providerId: string): Tier3Result {
   const providerClaims = claims.filter(c => c.provider_id === providerId);
-  
-  if (providerClaims.length < 20) return null;
-  
-  // Count frequency of each amount
+  const metrics: any[] = [];
+  let score = 0;
+
+  if (providerClaims.length < 20) {
+    return { score: 0, metrics: [] };
+  }
+
+  // 1. ANCHORING
+  const anchoringResult = detectAnchoring(providerClaims);
+  if (anchoringResult.isAnchored) {
+    score += 70;
+    metrics.push({
+      metric: 'Anchoring Bias',
+      description: `Amount $${anchoringResult.amount} repeated ${anchoringResult.count} times (${anchoringResult.percentage}%)`,
+      value: `${anchoringResult.percentage}%`,
+      tier: 3
+    });
+  }
+
+  // 2. CLAIM SPLITTING
+  const splittingResult = detectSplitting(providerClaims);
+  if (splittingResult.detected) {
+    score += 75;
+    metrics.push({
+      metric: 'Claim Splitting',
+      description: `${splittingResult.smallCount} small claims with round-number pattern`,
+      value: splittingResult.smallCount,
+      tier: 3
+    });
+  }
+
+  // 3. STEP-UP CODING
+  const stepUpResult = detectStepUp(providerClaims);
+  if (stepUpResult.detected) {
+    score += 65;
+    metrics.push({
+      metric: 'Step-Up Pattern',
+      description: `Average increased from $${stepUpResult.before} to $${stepUpResult.after}`,
+      value: `+${stepUpResult.increasePercent}%`,
+      tier: 3
+    });
+  }
+
+  return { score: Math.min(score, 100), metrics };
+}
+
+function detectAnchoring(claims: Claim[]): any {
   const amountCounts = new Map<number, number>();
-  providerClaims.forEach(claim => {
-    const amount = Math.round(claim.billed_amount * 100) / 100; // Round to cents
+  
+  claims.forEach(claim => {
+    const amount = Math.round(parseFloat(claim.billed_amount || '0'));
     amountCounts.set(amount, (amountCounts.get(amount) || 0) + 1);
   });
-  
-  // Find max repeat count
-  const maxRepeat = Math.max(...Array.from(amountCounts.values()));
-  const maxRepeatRate = maxRepeat / providerClaims.length;
-  
-  if (maxRepeat >= minRepeats && maxRepeatRate > 0.15) {
-    const anchoredAmount = Array.from(amountCounts.entries())
-      .find(([_, count]) => count === maxRepeat)?.[0] || 0;
-    
-    return {
-      metricName: 'Anchoring (Identical Amount Repeats)',
-      providerValue: maxRepeat,
-      baseline: 3.0,
-      peerPercentile: 94,
-      sampleN: providerClaims.length,
-      tier: 3,
-      anomalyTag: 'anchoring',
-      effectSize: anchoredAmount,
-    };
-  }
-  
-  return null;
+
+  const maxEntry = Array.from(amountCounts.entries())
+    .reduce((max, entry) => entry[1] > max[1] ? entry : max, [0, 0]);
+
+  const percentage = (maxEntry[1] / claims.length) * 100;
+
+  return {
+    isAnchored: percentage > 40 && maxEntry[1] > 10,
+    amount: maxEntry[0],
+    count: maxEntry[1],
+    percentage: percentage.toFixed(0)
+  };
 }
 
-// ============================================================================
-// CHANGE-POINT DETECTION (Step-Ups)
-// ============================================================================
+function detectSplitting(claims: Claim[]): any {
+  const amounts = claims.map(c => parseFloat(c.billed_amount || '0'));
+  const smallCount = amounts.filter(a => a < 50).length;
+  const roundCount = amounts.filter(a => a % 100 === 0).length;
 
-function detectStepChange(values: number[], minMagnitude: number = 0.3): {
-  detected: boolean;
-  changePoint: number;
-  beforeMean: number;
-  afterMean: number;
-  magnitude: number;
-} | null {
-  if (values.length < 20) return null;
-  
-  let maxMagnitude = 0;
-  let bestChangePoint = -1;
-  let bestBefore = 0;
-  let bestAfter = 0;
-  
-  // Test each potential change point
-  for (let i = 10; i < values.length - 10; i++) {
-    const before = values.slice(0, i);
-    const after = values.slice(i);
-    
-    const beforeMean = before.reduce((s, v) => s + v, 0) / before.length;
-    const afterMean = after.reduce((s, v) => s + v, 0) / after.length;
-    
-    // Calculate relative magnitude of change
-    const magnitude = (afterMean - beforeMean) / beforeMean;
-    
-    if (magnitude > maxMagnitude) {
-      maxMagnitude = magnitude;
-      bestChangePoint = i;
-      bestBefore = beforeMean;
-      bestAfter = afterMean;
-    }
-  }
-  
-  if (maxMagnitude > minMagnitude) {
-    return {
-      detected: true,
-      changePoint: bestChangePoint,
-      beforeMean: bestBefore,
-      afterMean: bestAfter,
-      magnitude: maxMagnitude,
-    };
-  }
-  
-  return null;
+  return {
+    detected: smallCount > 10 && roundCount > 5,
+    smallCount,
+    roundCount
+  };
 }
 
-export function detectChangePoint(
-  claims: ClaimWithHash[],
-  providerId: string,
-  minMagnitude: number = 0.3
-): AnomalyMetric | null {
-  const providerClaims = claims.filter(c => c.provider_id === providerId)
-    .sort((a, b) => a.service_date.getTime() - b.service_date.getTime());
-  
-  if (providerClaims.length < 30) return null;
-  
-  const amounts = providerClaims.map(c => c.billed_amount);
-  const result = detectStepChange(amounts, minMagnitude);
-  
-  if (result) {
-    return {
-      metricName: 'Change-Point (Step-Up)',
-      providerValue: result.afterMean,
-      baseline: result.beforeMean,
-      peerPercentile: 93,
-      effectSize: result.magnitude * 100,
-      sampleN: providerClaims.length,
-      tier: 3,
-      anomalyTag: 'change_point_up',
-    };
-  }
-  
-  return null;
-}
+function detectStepUp(claims: Claim[]): any {
+  const sorted = [...claims].sort((a, b) => 
+    new Date(a.service_date).getTime() - new Date(b.service_date).getTime()
+  );
 
-// ============================================================================
-// TIER 3 AGGREGATOR
-// ============================================================================
+  if (sorted.length < 20) return { detected: false };
 
-export function detectTier3Anomalies(
-  claims: ClaimWithHash[],
-  providerId: string,
-  config: {
-    claimSplittingWindowDays: number;
-    anchoringMinRepeats: number;
-    changePointMinMagnitude: number;
-  }
-): AnomalyMetric[] {
-  const results: AnomalyMetric[] = [];
-  
-  const splitting = detectClaimSplitting(
-    claims,
-    providerId,
-    config.claimSplittingWindowDays
-  );
-  if (splitting) results.push(splitting);
-  
-  const anchoring = detectAnchoring(
-    claims,
-    providerId,
-    config.anchoringMinRepeats
-  );
-  if (anchoring) results.push(anchoring);
-  
-  const changePoint = detectChangePoint(
-    claims,
-    providerId,
-    config.changePointMinMagnitude
-  );
-  if (changePoint) results.push(changePoint);
-  
-  return results;
+  const midpoint = Math.floor(sorted.length / 2);
+  const firstHalf = sorted.slice(0, midpoint);
+  const secondHalf = sorted.slice(midpoint);
+
+  const avgBefore = firstHalf.reduce((sum, c) => sum + parseFloat(c.billed_amount || '0'), 0) / firstHalf.length;
+  const avgAfter = secondHalf.reduce((sum, c) => sum + parseFloat(c.billed_amount || '0'), 0) / secondHalf.length;
+
+  const increasePercent = ((avgAfter - avgBefore) / avgBefore) * 100;
+
+  return {
+    detected: increasePercent > 30,
+    before: avgBefore.toFixed(0),
+    after: avgAfter.toFixed(0),
+    increasePercent: increasePercent.toFixed(0)
+  };
 }
