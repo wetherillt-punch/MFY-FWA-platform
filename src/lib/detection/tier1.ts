@@ -15,21 +15,25 @@ export function detectTier1(claims: Claim[], providerId: string): Tier1Result {
   const metrics: any[] = [];
   let score = 0;
 
-  // 1. DUPLICATE DETECTION (exact matches)
+  if (providerClaims.length === 0) {
+    return { score: 0, metrics: [] };
+  }
+
+  // 1. DUPLICATE DETECTION - normalize amounts to avoid .00 vs .0 issues
   const duplicates = findDuplicates(providerClaims);
   if (duplicates.length > 0) {
     score += 100;
     metrics.push({
       metric: 'Duplicate Claims',
-      description: `${duplicates.length} exact duplicate claims detected (same member, date, code, amount)`,
+      description: `${duplicates.length} exact duplicate claims detected`,
       value: duplicates.length,
       tier: 1
     });
   }
 
-  // 2. ROUND NUMBER CLUSTERING (>50%)
+  // 2. ROUND NUMBER CLUSTERING
   const amounts = providerClaims.map(c => parseFloat(c.billed_amount || '0'));
-  const roundCount = amounts.filter(a => a % 100 === 0).length;
+  const roundCount = amounts.filter(a => Math.abs(a % 100) < 0.01).length; // Handle floating point
   const roundPct = (roundCount / amounts.length) * 100;
   
   if (roundPct > 50) {
@@ -42,7 +46,7 @@ export function detectTier1(claims: Claim[], providerId: string): Tier1Result {
     });
   }
 
-  // 3. WEEKEND/HOLIDAY CONCENTRATION
+  // 3. WEEKEND CONCENTRATION
   const weekendCount = providerClaims.filter(c => {
     const date = new Date(c.service_date);
     const day = date.getDay();
@@ -66,16 +70,13 @@ export function detectTier1(claims: Claim[], providerId: string): Tier1Result {
     score += 90;
     metrics.push({
       metric: 'Impossible Daily Volume',
-      description: `${maxPerDay} claims in single day (physically impossible for most providers)`,
+      description: `${maxPerDay} claims in single day`,
       value: maxPerDay,
       tier: 1
     });
   }
 
-  return {
-    score: Math.min(score, 100),
-    metrics
-  };
+  return { score: Math.min(score, 100), metrics };
 }
 
 function findDuplicates(claims: Claim[]): Claim[] {
@@ -83,7 +84,10 @@ function findDuplicates(claims: Claim[]): Claim[] {
   const duplicates: Claim[] = [];
 
   claims.forEach(claim => {
-    const key = `${claim.member_id}-${claim.service_date}-${claim.cpt_hcpcs}-${claim.billed_amount}`;
+    // Normalize amount to avoid 300.0 vs 300.00 issues
+    const normalizedAmount = Math.round(parseFloat(claim.billed_amount || '0') * 100) / 100;
+    const key = `${claim.member_id}-${claim.service_date}-${claim.cpt_hcpcs}-${normalizedAmount}`;
+    
     if (seen.has(key)) {
       duplicates.push(claim);
     } else {
