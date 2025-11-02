@@ -9,6 +9,7 @@ export interface Tier1Result {
     value: any;
     tier: number;
   }>;
+  debug?: any; // Add debug field
 }
 
 export function detectTier1(claims: Claim[], providerId: string): Tier1Result {
@@ -16,25 +17,26 @@ export function detectTier1(claims: Claim[], providerId: string): Tier1Result {
   const metrics: any[] = [];
   let score = 0;
 
-  console.log(`[Tier1] Provider ${providerId}: ${providerClaims.length} claims`);
+  const debugInfo: any = {
+    totalClaims: providerClaims.length,
+    providerId
+  };
 
   if (providerClaims.length === 0) {
-    return { score: 0, metrics: [] };
+    return { score: 0, metrics: [], debug: debugInfo };
   }
 
-  // Log first few claims to debug
-  if (providerId === 'P90001') {
-    console.log('[Tier1] P90001 sample claims:', providerClaims.slice(0, 3).map(c => ({
-      member: c.member_id,
-      date: c.service_date,
-      code: c.cpt_hcpcs,
-      amount: c.billed_amount
-    })));
-  }
+  // Sample first 3 claims
+  debugInfo.sampleClaims = providerClaims.slice(0, 3).map(c => ({
+    member: c.member_id,
+    date: c.service_date,
+    code: c.cpt_hcpcs,
+    amount: c.billed_amount
+  }));
 
   // 1. DUPLICATE DETECTION
   const duplicates = findDuplicates(providerClaims);
-  console.log(`[Tier1] ${providerId} duplicates found: ${duplicates.length}`);
+  debugInfo.duplicatesFound = duplicates.length;
   
   if (duplicates.length > 0) {
     score += 100;
@@ -92,13 +94,16 @@ export function detectTier1(claims: Claim[], providerId: string): Tier1Result {
     });
   }
 
-  console.log(`[Tier1] ${providerId} final score: ${score}, metrics: ${metrics.length}`);
-  return { score: Math.min(score, 100), metrics };
+  debugInfo.finalScore = score;
+  debugInfo.metricsCount = metrics.length;
+
+  return { score: Math.min(score, 100), metrics, debug: debugInfo };
 }
 
 function findDuplicates(claims: Claim[]): Claim[] {
   const seen = new Map<string, Claim>();
   const duplicates: Claim[] = [];
+  const sampleKeys: string[] = [];
 
   claims.forEach((claim, idx) => {
     const normalizedDate = normalizeDateToYYYYMMDD(claim.service_date);
@@ -107,11 +112,10 @@ function findDuplicates(claims: Claim[]): Claim[] {
     const key = `${claim.member_id || 'UNKNOWN'}-${normalizedDate}-${claim.cpt_hcpcs}-${normalizedAmount}`;
     
     if (idx < 5) {
-      console.log(`[Tier1] Key ${idx}: ${key}`);
+      sampleKeys.push(key);
     }
     
     if (seen.has(key)) {
-      console.log(`[Tier1] DUPLICATE! Key: ${key}`);
       duplicates.push(claim);
     } else {
       seen.set(key, claim);
