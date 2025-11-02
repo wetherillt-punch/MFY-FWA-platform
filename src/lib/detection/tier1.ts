@@ -17,6 +17,7 @@ export function detectTier1(claims: Claim[], providerId: string): Tier1Result {
   let score = 0;
 
   if (providerClaims.length === 0) {
+    console.log(`[TIER1] No claims for ${providerId}, returning empty`);
     return { score: 0, metrics: [] };
   }
 
@@ -39,9 +40,10 @@ export function detectTier1(claims: Claim[], providerId: string): Tier1Result {
     }
   });
   
-  console.log(`[TIER1] Duplicate check for ${providerId}: found ${duplicates.length} duplicates`);
+  console.log(`[TIER1] ${providerId}: Found ${duplicates.length} duplicates`);
   
   if (duplicates.length > 0) {
+    console.log(`[TIER1] ${providerId}: Adding duplicate metric, score will be 100`);
     score += 100;
     metrics.push({
       metric: 'Duplicate Claims',
@@ -49,6 +51,7 @@ export function detectTier1(claims: Claim[], providerId: string): Tier1Result {
       value: duplicates.length,
       tier: 1
     });
+    console.log(`[TIER1] ${providerId}: After push, metrics length = ${metrics.length}, score = ${score}`);
   }
 
   // Round number detection
@@ -66,6 +69,7 @@ export function detectTier1(claims: Claim[], providerId: string): Tier1Result {
     });
   }
 
+  console.log(`[TIER1] ${providerId}: RETURNING score=${score}, metrics.length=${metrics.length}`);
   return { score: Math.min(score, 100), metrics };
 }
 
