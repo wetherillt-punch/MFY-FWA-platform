@@ -38,9 +38,9 @@ export async function POST(request: NextRequest) {
       c.claim_id && c.provider_id && c.service_date && c.billed_amount
     );
 
-    // DEBUG: Get P90001 claims that should be duplicates
+    // DEBUG: Get first 5 P90001 claims to see actual data
     const p90001Debug = validClaims
-      .filter(c => c.provider_id === 'P90001' && c.member_id === 'MEM200')
+      .filter(c => c.provider_id === 'P90001').slice(0, 5)
       .map(c => ({
         claim_id: c.claim_id,
         member_id: c.member_id,
