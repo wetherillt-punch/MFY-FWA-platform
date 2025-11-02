@@ -12,6 +12,7 @@ export interface Tier1Result {
 }
 
 export function detectTier1(claims: Claim[], providerId: string): Tier1Result {
+  console.log(`[TIER1] Called for ${providerId}, total claims: ${claims.length}`);
   const providerClaims = claims.filter(c => c.provider_id === providerId);
   const metrics: any[] = [];
   let score = 0;
@@ -33,6 +34,7 @@ export function detectTier1(claims: Claim[], providerId: string): Tier1Result {
     }
   });
   
+  console.log(`[TIER1] Duplicate check for ${providerId}: found ${duplicates.length} duplicates`);
   if (duplicates.length > 0) {
     score += 100;
     metrics.push({
