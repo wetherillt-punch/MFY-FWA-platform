@@ -16,12 +16,25 @@ export function detectTier1(claims: Claim[], providerId: string): Tier1Result {
   const metrics: any[] = [];
   let score = 0;
 
+  console.log(`[Tier1] Provider ${providerId}: ${providerClaims.length} claims`);
+
   if (providerClaims.length === 0) {
     return { score: 0, metrics: [] };
   }
 
-  // 1. DUPLICATE DETECTION - with robust date/amount handling
+  // Log first few claims to debug
+  if (providerId === 'P90001') {
+    console.log('[Tier1] P90001 sample claims:', providerClaims.slice(0, 3).map(c => ({
+      member: c.member_id,
+      date: c.service_date,
+      code: c.cpt_hcpcs,
+      amount: c.billed_amount
+    })));
+  }
+
+  // 1. DUPLICATE DETECTION
   const duplicates = findDuplicates(providerClaims);
+  console.log(`[Tier1] ${providerId} duplicates found: ${duplicates.length}`);
   
   if (duplicates.length > 0) {
     score += 100;
@@ -42,7 +55,7 @@ export function detectTier1(claims: Claim[], providerId: string): Tier1Result {
     score += 80;
     metrics.push({
       metric: 'Round Number Clustering',
-      description: `${roundPct.toFixed(0)}% round-dollar amounts (peer: 12%)`,
+      description: `${roundPct.toFixed(0)}% round-dollar amounts`,
       value: `${roundPct.toFixed(0)}%`,
       tier: 1
     });
@@ -51,7 +64,7 @@ export function detectTier1(claims: Claim[], providerId: string): Tier1Result {
   // 3. WEEKEND CONCENTRATION
   const weekendCount = providerClaims.filter(c => {
     const dateStr = normalizeDateToYYYYMMDD(c.service_date);
-    const date = new Date(dateStr + 'T12:00:00'); // Add time to avoid timezone issues
+    const date = new Date(dateStr + 'T12:00:00');
     const day = date.getDay();
     return day === 0 || day === 6;
   }).length;
@@ -61,7 +74,7 @@ export function detectTier1(claims: Claim[], providerId: string): Tier1Result {
     score += 60;
     metrics.push({
       metric: 'Weekend Concentration',
-      description: `${weekendPct.toFixed(0)}% weekend claims (peer: 25%)`,
+      description: `${weekendPct.toFixed(0)}% weekend claims`,
       value: `${weekendPct.toFixed(0)}%`,
       tier: 1
     });
@@ -79,6 +92,7 @@ export function detectTier1(claims: Claim[], providerId: string): Tier1Result {
     });
   }
 
+  console.log(`[Tier1] ${providerId} final score: ${score}, metrics: ${metrics.length}`);
   return { score: Math.min(score, 100), metrics };
 }
 
@@ -86,15 +100,18 @@ function findDuplicates(claims: Claim[]): Claim[] {
   const seen = new Map<string, Claim>();
   const duplicates: Claim[] = [];
 
-  claims.forEach((claim) => {
-    // Use robust normalizers
+  claims.forEach((claim, idx) => {
     const normalizedDate = normalizeDateToYYYYMMDD(claim.service_date);
     const normalizedAmount = normalizeAmount(claim.billed_amount);
     
-    // Create key
     const key = `${claim.member_id || 'UNKNOWN'}-${normalizedDate}-${claim.cpt_hcpcs}-${normalizedAmount}`;
     
+    if (idx < 5) {
+      console.log(`[Tier1] Key ${idx}: ${key}`);
+    }
+    
     if (seen.has(key)) {
+      console.log(`[Tier1] DUPLICATE! Key: ${key}`);
       duplicates.push(claim);
     } else {
       seen.set(key, claim);
