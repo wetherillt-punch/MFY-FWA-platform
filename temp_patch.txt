@@ -1,0 +1,7 @@
+  // DEBUG: Sample claims for P90001
+  const claimSample = providerId === 'P90001' ? providerClaims.slice(0, 5).map(c => ({
+    member_id: c.member_id,
+    service_date: c.service_date,
+    cpt_hcpcs: c.cpt_hcpcs,
+    billed_amount: c.billed_amount
+  })) : undefined;
