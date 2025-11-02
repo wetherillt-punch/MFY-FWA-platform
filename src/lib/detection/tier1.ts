@@ -1,5 +1,4 @@
 import { Claim } from '@/types/detection';
-import { normalizeDateToYYYYMMDD, normalizeAmount } from './date-utils';
 
 export interface Tier1Result {
   score: number;
@@ -21,12 +20,18 @@ export function detectTier1(claims: Claim[], providerId: string): Tier1Result {
     return { score: 0, metrics: [] };
   }
 
-  // DUPLICATE DETECTION - EXACT SAME LOGIC AS DIAGNOSE ENDPOINT
+  // DUPLICATE DETECTION
   const dupeCheck = new Map();
   const duplicates: Claim[] = [];
   
   providerClaims.forEach(claim => {
-    const key = `${claim.member_id}-${claim.service_date}-${claim.cpt_hcpcs}-${claim.billed_amount}`;
+    const memberId = (claim.member_id || 'UNKNOWN').trim().toUpperCase();
+    const serviceDate = (claim.service_date || '').trim();
+    const code = (claim.cpt_hcpcs || '').trim().toUpperCase();
+    const amount = Math.round(parseFloat(claim.billed_amount || '0') * 100) / 100;
+    
+    const key = `${memberId}-${serviceDate}-${code}-${amount}`;
+    
     if (dupeCheck.has(key)) {
       duplicates.push(claim);
     } else {
@@ -35,6 +40,7 @@ export function detectTier1(claims: Claim[], providerId: string): Tier1Result {
   });
   
   console.log(`[TIER1] Duplicate check for ${providerId}: found ${duplicates.length} duplicates`);
+  
   if (duplicates.length > 0) {
     score += 100;
     metrics.push({
