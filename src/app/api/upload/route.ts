@@ -38,9 +38,20 @@ export async function POST(request: NextRequest) {
       c.claim_id && c.provider_id && c.service_date && c.billed_amount
     );
 
+    // DEBUG: Get P90001 claims that should be duplicates
+    const p90001Debug = validClaims
+      .filter(c => c.provider_id === 'P90001' && c.member_id === 'MEM200')
+      .map(c => ({
+        claim_id: c.claim_id,
+        member_id: c.member_id,
+        service_date: c.service_date,
+        cpt_hcpcs: c.cpt_hcpcs,
+        billed_amount: c.billed_amount
+      }));
+
     if (validClaims.length === 0) {
       return NextResponse.json({ 
-        error: 'No valid claims found. Required fields: claim_id, provider_id, service_date, billed_amount' 
+        error: 'No valid claims found' 
       }, { status: 400 });
     }
 
@@ -76,6 +87,7 @@ export async function POST(request: NextRequest) {
       totalBilled,
       totalFlagged,
       leads,
+      DEBUG_P90001_MEM200: p90001Debug, // This will show in response
       analysisDate: new Date().toISOString()
     });
 
