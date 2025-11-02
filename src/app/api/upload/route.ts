@@ -39,15 +39,6 @@ export async function POST(request: NextRequest) {
     );
 
     // DEBUG: Get first 5 P90001 claims to see actual data
-    const p90001Debug = validClaims
-      .filter(c => c.provider_id === 'P90001').slice(0, 5)
-      .map(c => ({
-        claim_id: c.claim_id,
-        member_id: c.member_id,
-        service_date: c.service_date,
-        cpt_hcpcs: c.cpt_hcpcs,
-        billed_amount: c.billed_amount
-      }));
 
     if (validClaims.length === 0) {
       return NextResponse.json({ 
@@ -89,7 +80,6 @@ export async function POST(request: NextRequest) {
       qualityReport: {
         qualityScore: 95
       },
-      DEBUG_P90001_MEM200: p90001Debug
     });
 
   } catch (error: any) {
