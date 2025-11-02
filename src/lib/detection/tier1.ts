@@ -19,8 +19,9 @@ export function detectTier1(claims: Claim[], providerId: string): Tier1Result {
     return { score: 0, metrics: [] };
   }
 
-  // 1. DUPLICATE DETECTION - normalize amounts to avoid .00 vs .0 issues
+  // 1. DUPLICATE DETECTION
   const duplicates = findDuplicates(providerClaims);
+  
   if (duplicates.length > 0) {
     score += 100;
     metrics.push({
@@ -31,16 +32,16 @@ export function detectTier1(claims: Claim[], providerId: string): Tier1Result {
     });
   }
 
-  // 2. ROUND NUMBER CLUSTERING
+  // 2. ROUND NUMBERS
   const amounts = providerClaims.map(c => parseFloat(c.billed_amount || '0'));
-  const roundCount = amounts.filter(a => Math.abs(a % 100) < 0.01).length; // Handle floating point
+  const roundCount = amounts.filter(a => Math.abs(a % 100) < 0.01).length;
   const roundPct = (roundCount / amounts.length) * 100;
   
   if (roundPct > 50) {
     score += 80;
     metrics.push({
       metric: 'Round Number Clustering',
-      description: `${roundPct.toFixed(0)}% of claims are round-dollar amounts (peer baseline: 12%)`,
+      description: `${roundPct.toFixed(0)}% round-dollar amounts`,
       value: `${roundPct.toFixed(0)}%`,
       tier: 1
     });
@@ -58,7 +59,7 @@ export function detectTier1(claims: Claim[], providerId: string): Tier1Result {
     score += 60;
     metrics.push({
       metric: 'Weekend Concentration',
-      description: `${weekendPct.toFixed(0)}% of claims on weekends (peer baseline: 25%)`,
+      description: `${weekendPct.toFixed(0)}% weekend claims`,
       value: `${weekendPct.toFixed(0)}%`,
       tier: 1
     });
@@ -70,7 +71,7 @@ export function detectTier1(claims: Claim[], providerId: string): Tier1Result {
     score += 90;
     metrics.push({
       metric: 'Impossible Daily Volume',
-      description: `${maxPerDay} claims in single day`,
+      description: `${maxPerDay} claims in one day`,
       value: maxPerDay,
       tier: 1
     });
@@ -83,10 +84,15 @@ function findDuplicates(claims: Claim[]): Claim[] {
   const seen = new Map<string, Claim>();
   const duplicates: Claim[] = [];
 
-  claims.forEach(claim => {
-    // Normalize amount to avoid 300.0 vs 300.00 issues
+  claims.forEach((claim) => {
+    // Normalize date to YYYY-MM-DD format (handles various date formats)
+    const normalizedDate = claim.service_date.split('T')[0];
+    
+    // Normalize amount 
     const normalizedAmount = Math.round(parseFloat(claim.billed_amount || '0') * 100) / 100;
-    const key = `${claim.member_id}-${claim.service_date}-${claim.cpt_hcpcs}-${normalizedAmount}`;
+    
+    // Create key - use normalized date
+    const key = `${claim.member_id}-${normalizedDate}-${claim.cpt_hcpcs}-${normalizedAmount}`;
     
     if (seen.has(key)) {
       duplicates.push(claim);
