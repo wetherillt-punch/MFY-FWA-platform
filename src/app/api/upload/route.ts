@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import * as XLSX from 'xlsx';
 import { runComprehensiveDetection } from '@/lib/detection/orchestrator';
 import { Claim } from '@/types/detection';
+import { normalizeDateToYYYYMMDD } from '@/lib/detection/date-utils';
 
 export async function POST(request: NextRequest) {
   try {
@@ -23,7 +24,7 @@ export async function POST(request: NextRequest) {
       claim_id: String(row.claim_id || row.CLAIM_ID || ''),
       provider_id: String(row.provider_id || row.PROVIDER_ID || ''),
       member_id: String(row.member_id || row.MEMBER_ID || ''),
-      service_date: String(row.service_date || row.SERVICE_DATE || ''),
+      service_date: normalizeDateToYYYYMMDD(row.service_date || row.SERVICE_DATE || ''),
       billed_amount: String(row.billed_amount || row.BILLED_AMOUNT || '0'),
       paid_amount: String(row.paid_amount || row.PAID_AMOUNT || ''),
       cpt_hcpcs: String(row.cpt_hcpcs || row.CPT_HCPCS || row.code || ''),
@@ -39,13 +40,9 @@ export async function POST(request: NextRequest) {
 
     if (validClaims.length === 0) {
       return NextResponse.json({ 
-        error: 'No valid claims found' 
+        error: 'No valid claims found. Required fields: claim_id, provider_id, service_date, billed_amount' 
       }, { status: 400 });
     }
-
-    // Sample first 3 claims for P90001 for debugging
-    const p90001Sample = validClaims.filter(c => c.provider_id === 'P90001').slice(0, 3);
-    console.log('P90001 sample claims:', JSON.stringify(p90001Sample, null, 2));
 
     const uniqueProviders = [...new Set(validClaims.map(c => c.provider_id))];
 
@@ -79,7 +76,6 @@ export async function POST(request: NextRequest) {
       totalBilled,
       totalFlagged,
       leads,
-      debugSample: p90001Sample, // Add debug info
       analysisDate: new Date().toISOString()
     });
 
