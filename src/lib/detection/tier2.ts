@@ -15,7 +15,7 @@ export function detectTier2(claims: Claim[], providerId: string, allProviders: s
   const metrics: any[] = [];
   let score = 0;
 
-  if (providerClaims.length < 30) {
+  if (providerClaims.length < 20) {
     return { score: 0, metrics: [] };
   }
 

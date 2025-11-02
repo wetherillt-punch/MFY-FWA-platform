@@ -15,7 +15,7 @@ export function detectTier4(claims: Claim[], providerId: string): Tier4Result {
   const metrics: any[] = [];
   let score = 0;
 
-  if (providerClaims.length < 30) {
+  if (providerClaims.length < 20) {
     return { score: 0, metrics: [] };
   }
 
