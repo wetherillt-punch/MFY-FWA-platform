@@ -9,7 +9,7 @@ export interface Tier1Result {
     value: any;
     tier: number;
   }>;
-  debug?: any; // Add debug field
+  debug?: any;
 }
 
 export function detectTier1(claims: Claim[], providerId: string): Tier1Result {
@@ -17,26 +17,22 @@ export function detectTier1(claims: Claim[], providerId: string): Tier1Result {
   const metrics: any[] = [];
   let score = 0;
 
-  const debugInfo: any = {
+  // DEBUG for P90001
+  const debugData = providerId === 'P90001' ? {
     totalClaims: providerClaims.length,
-    providerId
-  };
+    sampleClaims: providerClaims.slice(0, 3).map(c => ({
+      member: c.member_id,
+      date: c.service_date,
+      code: c.cpt_hcpcs,
+      amount: c.billed_amount
+    }))
+  } : undefined;
 
   if (providerClaims.length === 0) {
-    return { score: 0, metrics: [], debug: debugInfo };
+    return { score: 0, metrics: [], debug: debugData };
   }
 
-  // Sample first 3 claims
-  debugInfo.sampleClaims = providerClaims.slice(0, 3).map(c => ({
-    member: c.member_id,
-    date: c.service_date,
-    code: c.cpt_hcpcs,
-    amount: c.billed_amount
-  }));
-
-  // 1. DUPLICATE DETECTION
   const duplicates = findDuplicates(providerClaims);
-  debugInfo.duplicatesFound = duplicates.length;
   
   if (duplicates.length > 0) {
     score += 100;
@@ -48,7 +44,6 @@ export function detectTier1(claims: Claim[], providerId: string): Tier1Result {
     });
   }
 
-  // 2. ROUND NUMBERS
   const amounts = providerClaims.map(c => normalizeAmount(c.billed_amount));
   const roundCount = amounts.filter(a => Math.abs(a % 100) < 0.01).length;
   const roundPct = (roundCount / amounts.length) * 100;
@@ -63,7 +58,6 @@ export function detectTier1(claims: Claim[], providerId: string): Tier1Result {
     });
   }
 
-  // 3. WEEKEND CONCENTRATION
   const weekendCount = providerClaims.filter(c => {
     const dateStr = normalizeDateToYYYYMMDD(c.service_date);
     const date = new Date(dateStr + 'T12:00:00');
@@ -82,7 +76,6 @@ export function detectTier1(claims: Claim[], providerId: string): Tier1Result {
     });
   }
 
-  // 4. IMPOSSIBLE VOLUME
   const maxPerDay = getMaxClaimsPerDay(providerClaims);
   if (maxPerDay > 50) {
     score += 90;
@@ -94,26 +87,18 @@ export function detectTier1(claims: Claim[], providerId: string): Tier1Result {
     });
   }
 
-  debugInfo.finalScore = score;
-  debugInfo.metricsCount = metrics.length;
-
-  return { score: Math.min(score, 100), metrics, debug: debugInfo };
+  return { score: Math.min(score, 100), metrics, debug: debugData };
 }
 
 function findDuplicates(claims: Claim[]): Claim[] {
   const seen = new Map<string, Claim>();
   const duplicates: Claim[] = [];
-  const sampleKeys: string[] = [];
 
-  claims.forEach((claim, idx) => {
+  claims.forEach((claim) => {
     const normalizedDate = normalizeDateToYYYYMMDD(claim.service_date);
     const normalizedAmount = normalizeAmount(claim.billed_amount);
     
     const key = `${claim.member_id || 'UNKNOWN'}-${normalizedDate}-${claim.cpt_hcpcs}-${normalizedAmount}`;
-    
-    if (idx < 5) {
-      sampleKeys.push(key);
-    }
     
     if (seen.has(key)) {
       duplicates.push(claim);
