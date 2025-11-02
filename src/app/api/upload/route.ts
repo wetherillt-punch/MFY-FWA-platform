@@ -12,7 +12,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'No file provided' }, { status: 400 });
     }
 
-    // Read file
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
     const workbook = XLSX.read(buffer, { type: 'buffer' });
@@ -20,7 +19,6 @@ export async function POST(request: NextRequest) {
     const worksheet = workbook.Sheets[sheetName];
     const rawData = XLSX.utils.sheet_to_json(worksheet);
 
-    // Parse and validate claims
     const claims: Claim[] = rawData.map((row: any) => ({
       claim_id: String(row.claim_id || row.CLAIM_ID || ''),
       provider_id: String(row.provider_id || row.PROVIDER_ID || ''),
@@ -35,37 +33,30 @@ export async function POST(request: NextRequest) {
       diagnosis_code: String(row.diagnosis_code || row.DIAGNOSIS_CODE || '')
     }));
 
-    // Validate required fields
     const validClaims = claims.filter(c => 
       c.claim_id && c.provider_id && c.service_date && c.billed_amount
     );
 
     if (validClaims.length === 0) {
       return NextResponse.json({ 
-        error: 'No valid claims found. Required fields: claim_id, provider_id, service_date, billed_amount' 
+        error: 'No valid claims found' 
       }, { status: 400 });
     }
 
-    console.log(`✅ Parsed ${validClaims.length} valid claims`);
+    // Sample first 3 claims for P90001 for debugging
+    const p90001Sample = validClaims.filter(c => c.provider_id === 'P90001').slice(0, 3);
+    console.log('P90001 sample claims:', JSON.stringify(p90001Sample, null, 2));
 
-    // Get unique providers
     const uniqueProviders = [...new Set(validClaims.map(c => c.provider_id))];
-    console.log(`📊 Analyzing ${uniqueProviders.length} providers`);
 
-    // Run comprehensive detection for each provider
     const results = uniqueProviders.map(providerId => {
-      console.log(`🔍 Detecting FWA for provider ${providerId}...`);
       return runComprehensiveDetection(validClaims, providerId, uniqueProviders);
     });
 
-    // Filter to only providers with issues (score > 0)
     const leads = results
       .filter(r => r.overallScore > 0)
       .sort((a, b) => b.overallScore - a.overallScore);
 
-    console.log(`🚨 Found ${leads.length} leads requiring attention`);
-
-    // Calculate summary statistics
     const highPriority = leads.filter(l => l.priority === 'HIGH').length;
     const mediumPriority = leads.filter(l => l.priority === 'MEDIUM').length;
     const watchlist = leads.filter(l => l.priority === 'WATCHLIST').length;
@@ -75,9 +66,6 @@ export async function POST(request: NextRequest) {
     );
 
     const totalFlagged = leads.reduce((sum, l) => sum + l.totalBilled, 0);
-
-    console.log(`📈 Summary: ${highPriority} HIGH, ${mediumPriority} MEDIUM, ${watchlist} WATCHLIST`);
-    console.log(`💰 Total billed: $${totalBilled.toLocaleString()}, Flagged: $${totalFlagged.toLocaleString()}`);
 
     return NextResponse.json({
       success: true,
@@ -91,6 +79,7 @@ export async function POST(request: NextRequest) {
       totalBilled,
       totalFlagged,
       leads,
+      debugSample: p90001Sample, // Add debug info
       analysisDate: new Date().toISOString()
     });
 
