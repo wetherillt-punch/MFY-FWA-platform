@@ -4,11 +4,12 @@ import { useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
 import Link from 'next/link'
 import { ArrowLeft, AlertTriangle, TrendingUp, Activity, Sparkles, Loader2, Info } from 'lucide-react'
+import AnalysisDisplay from '@/components/AnalysisDisplay'
 
 export default function LeadDetailPage() {
   const params = useParams()
   const [leadData, setLeadData] = useState<any>(null)
-  const [agentAnalysis, setAgentAnalysis] = useState<string | null>(null)
+  const [agentAnalysis, setAgentAnalysis] = useState<any>(null)
   const [isAnalyzing, setIsAnalyzing] = useState(false)
 
   useEffect(() => {
@@ -193,7 +194,7 @@ export default function LeadDetailPage() {
               </>
             ) : (
               <div className="bg-white rounded-lg p-8 border border-purple-200">
-                <div dangerouslySetInnerHTML={{ __html: agentAnalysis }} />
+                <AnalysisDisplay analysis={agentAnalysis} />
               </div>
             )}
           </div>
@@ -202,4 +203,3 @@ export default function LeadDetailPage() {
     </main>
   )
 }
-// Build 1762043093
