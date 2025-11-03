@@ -115,9 +115,15 @@ function compareToPeers(providerId: string, allClaims: Claim[], allProviders: st
 
   const sorted = providerMetrics.map(m => m.claimsPerMonth).sort((a, b) => a - b);
   const percentile = (sorted.filter(v => v < targetMetric.claimsPerMonth).length / sorted.length) * 100;
+  
+  // Calculate z-score for more robust detection
+  const mean = sorted.reduce((a, b) => a + b, 0) / sorted.length;
+  const variance = sorted.reduce((sum, val) => sum + Math.pow(val - mean, 2), 0) / sorted.length;
+  const stdDev = Math.sqrt(variance);
+  const zScore = stdDev > 0 ? (targetMetric.claimsPerMonth - mean) / stdDev : 0;
 
   return {
-    isOutlier: percentile > 95,
+    isOutlier: percentile > 99 && zScore > 3,
     percentile: Math.round(percentile),
     metric: 'Claims/month'
   };

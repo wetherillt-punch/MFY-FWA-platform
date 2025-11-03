@@ -1,0 +1,10 @@
+In src/lib/detection/phase3-patterns.ts, in the detectModifier25Misuse function, 
+add console logging right before the filter:
+
+console.log('Sample E&M claim modifiers:', emCodes.slice(0, 3).map(c => ({
+  cpt: c.cpt_hcpcs,
+  modifiers: c.modifiers,
+  type: typeof c.modifiers
+})));
+
+This will show us what the actual data looks like.
