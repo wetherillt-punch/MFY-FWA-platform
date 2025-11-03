@@ -30,7 +30,7 @@ export async function POST(request: NextRequest) {
       paid_amount: String(row.paid_amount || row.PAID_AMOUNT || ''),
       cpt_hcpcs: String(row.cpt_hcpcs || row.CPT_HCPCS || row.code || ''),
       cpt_description: String(row.cpt_description || row.CPT_DESCRIPTION || row.description || ''),
-      modifiers: String(row.modifier || row.modifiers || row.MODIFIER || row.MODIFIERS || ''),
+      modifiers: String(row.modifiers || row.MODIFIERS || ''),
       place_of_service: String(row.place_of_service || row.PLACE_OF_SERVICE || ''),
       diagnosis_code: String(row.diagnosis_code || row.DIAGNOSIS_CODE || '')
     }));
@@ -54,7 +54,7 @@ export async function POST(request: NextRequest) {
     });
 
     const leads = results
-      .filter(r => r.overallScore >= 25)
+      .filter(r => r.overallScore >= 10)
       .sort((a, b) => b.overallScore - a.overallScore);
 
     const highPriority = leads.filter(l => l.priority === 'HIGH').length;

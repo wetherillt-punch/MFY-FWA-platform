@@ -89,23 +89,9 @@ function detectModifier25Misuse(claims: Claim[]) {
     })));
   }
 
-  const withMod25 = emCodes.filter(c => {
-    if (!c.modifiers) return false;
-    
-    // Handle array of modifiers
-    if (Array.isArray(c.modifiers)) {
-      return c.modifiers.some((m: any) => 
-        m === 25 || m === '25' || String(m) === '25'
-      );
-    }
-    
-    // Handle single modifier value
-    return c.modifiers === 25 || 
-           c.modifiers === '25' || 
-           String(c.modifiers) === '25';
-  }).length;
-  
-  console.log(`Provider - Modifier 25: ${withMod25}/${emCodes.length} E&M claims (${((withMod25 / emCodes.length) * 100).toFixed(1)}%)`);
+  const withMod25 = emCodes.filter(c => 
+    c.modifiers && String(c.modifiers).includes("25")
+  ).length;
 
   const mod25Pct = (withMod25 / emCodes.length) * 100;
 

@@ -54,7 +54,7 @@ export async function POST(request: NextRequest) {
     });
 
     const leads = results
-      .filter(r => r.overallScore >= 25)
+      .filter(r => r.overallScore >= 10)
       .sort((a, b) => b.overallScore - a.overallScore);
 
     const highPriority = leads.filter(l => l.priority === 'HIGH').length;
