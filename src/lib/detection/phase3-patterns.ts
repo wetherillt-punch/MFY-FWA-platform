@@ -75,6 +75,20 @@ function detectModifier25Misuse(claims: Claim[]) {
   
   if (emCodes.length < 5) return null;
 
+  
+  // DEBUG: Log sample E&M claims to see what modifiers look like
+  if (emCodes.length > 0) {
+    console.log('=== MODIFIER 25 DEBUG ===');
+    console.log('Provider has', emCodes.length, 'E&M codes');
+    console.log('Sample claims:', emCodes.slice(0, 5).map(c => ({
+      cpt: c.cpt_hcpcs,
+      modifiers: c.modifiers,
+      modifiersType: typeof c.modifiers,
+      stringCheck: String(c.modifiers),
+      includesCheck: String(c.modifiers).includes("25")
+    })));
+  }
+
   const withMod25 = emCodes.filter(c => 
     c.modifiers && String(c.modifiers).includes("25")
   ).length;
