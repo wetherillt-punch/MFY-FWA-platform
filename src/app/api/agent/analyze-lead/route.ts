@@ -1,91 +1,155 @@
 import { NextRequest, NextResponse } from 'next/server';
 import Anthropic from '@anthropic-ai/sdk';
+import { LeadAnalysisSchema } from '@/lib/agent/schemas';
+import { 
+  formatDeviation, 
+  formatCurrency, 
+  formatComparativeMetric,
+  formatPriority 
+} from '@/lib/formatting/report-formatter';
 
 const anthropic = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY,
 });
 
-export const maxDuration = 30;
-export const dynamic = 'force-dynamic';
-
 export async function POST(request: NextRequest) {
   try {
     const { lead } = await request.json();
-    if (!lead) return NextResponse.json({ error: 'Lead required' }, { status: 400 });
 
-    const totalBilled = lead.totalBilled || (lead.claimCount * 500);
-    const estimatedPeerTotal = lead.claimCount * 250;
-    const estimatedOverpayment = totalBilled - estimatedPeerTotal;
+    const systemPrompt = `You are an expert healthcare fraud analyst. Analyze provider data and return ONLY valid JSON matching this schema:
 
-    const rulesHTML = lead.matchedRules?.length > 0
-      ? lead.matchedRules.map((r: any) => `<tr class='hover:bg-gray-50'><td class='border border-gray-300 px-6 py-4 font-medium'>${r.rule_id}</td><td class='border border-gray-300 px-6 py-4'>${r.rule_name}</td><td class='border border-gray-300 px-6 py-4'>${r.explanation}</td></tr>`).join('')
-      : `<tr><td class='border border-gray-300 px-6 py-4 font-medium'>Pattern-based</td><td class='border border-gray-300 px-6 py-4'>Anomaly Detection</td><td class='border border-gray-300 px-6 py-4'>Statistical patterns detected</td></tr>`;
+{
+  "summary": "string - Executive summary in 2-3 sentences",
+  "comparative_analysis": {
+    "claims_per_month": {
+      "provider": number,
+      "peer": number,
+      "deviation_percent": number (negative if below peer, positive if above)
+    },
+    "round_dollar_percent": {
+      "provider": number,
+      "peer": number, 
+      "deviation_pp": number (percentage point difference)
+    },
+    "total_flagged": {
+      "provider": number,
+      "peer": number,
+      "deviation_percent": number
+    }
+  },
+  "flagged_codes": [
+    {
+      "code": "string",
+      "description": "string", 
+      "count": number,
+      "avg_amount": number,
+      "total_amount": number
+    }
+  ],
+  "priority_level": "IMMEDIATE_INVESTIGATION" | "HIGH_PRIORITY" | "ROUTINE_MONITORING" | "WATCHLIST",
+  "next_steps": ["string", "string", ...],
+  "estimated_overpayment": number (always positive)
+}
 
-    const codesHTML = lead.topCodes?.map((c: any) => {
-      const avg = (c.totalBilled / c.count).toFixed(0);
-      return `<li class='mb-2'><strong>${c.code}</strong> - ${c.description}<br/><span class='text-sm text-gray-600 ml-4'>${c.count} claims × $${avg} avg = $${c.totalBilled.toLocaleString()} total</span></li>`;
-    }).join('') || '';
+CRITICAL RULES:
+1. Return ONLY valid JSON - no markdown, no explanations
+2. Use raw numbers for all deviations (negative for below peer, positive for above)
+3. estimated_overpayment must be positive (it's money to recover)
+4. Be precise with numbers - calculate deviations accurately
+5. priority_level must be one of the 4 exact enum values`;
 
-    // Build detailed context for AI
-    const topCodesText = lead.topCodes?.map((c: any) => 
-      `${c.code} (${c.description}): ${c.count} claims, $${c.totalBilled.toLocaleString()} total, $${(c.totalBilled/c.count).toFixed(0)} avg`
-    ).join('; ') || 'No code data';
+    const userPrompt = `Analyze this provider and return structured JSON:
 
-    const rulesText = lead.matchedRules?.map((r: any) => 
-      `${r.rule_id} (${r.rule_name})`
-    ).join(', ') || 'Pattern-based detection';
+Provider: ${lead.provider_id}
+Priority: ${lead.priority}
+Overall Score: ${lead.overallScore}
+Claim Count: ${lead.claimCount}
+Total Billed: $${lead.totalBilled?.toLocaleString()}
 
-    const fraudIndicators = [];
-    if (lead.hasRoundNumbers) fraudIndicators.push('100% round-dollar amounts vs 12% peer baseline');
-    if (lead.hasModifier59) fraudIndicators.push('systematic modifier-59 usage vs 8-12% peer baseline');
-    if (lead.hasDailyPattern) fraudIndicators.push('daily consecutive billing (medically impossible)');
+Tier 1 Score: ${lead.tier1Score}
+Tier 1 Metrics: ${JSON.stringify(lead.tier1Metrics)}
 
-    const prompt = `You are a healthcare fraud investigator. Analyze this case and write a concise 2-3 sentence summary.
+Tier 2 Score: ${lead.tier2Score}
+Tier 2 Metrics: ${JSON.stringify(lead.tier2Metrics)}
 
-PROVIDER: ${lead.provider_id}
-RISK LEVEL: ${lead.priority}
-TOTAL CLAIMS: ${lead.claimCount}
-TOTAL BILLED: $${totalBilled.toLocaleString()}
-ESTIMATED OVERPAYMENT: $${estimatedOverpayment.toLocaleString()}
+Tier 3 Score: ${lead.tier3Score}
+Advanced Patterns: ${JSON.stringify(lead.advancedPatterns)}
 
-MATCHED FWA RULES: ${rulesText}
+Top Codes: ${JSON.stringify(lead.topCodes?.slice(0, 5))}
 
-TOP PROCEDURE CODES:
-${topCodesText}
-
-FRAUD INDICATORS:
-${fraudIndicators.join('; ')}
-
-TIER SCORES:
-Tier 1 (Critical Red Flags): ${lead.tier1Score}
-Tier 2 (Statistical Outliers): ${lead.tier2Score}
-Tier 3 (Suspicious Patterns): ${lead.tier3Score}
-Tier 4 (Emerging Trends): ${lead.tier4Score}
-
-Write a 2-3 sentence summary that:
-1. Names the specific provider
-2. Mentions exact CPT codes from the data above
-3. States total dollar amounts
-4. Identifies the fraud pattern (e.g., "daily wound care billing" or "modifier-59 unbundling")
-5. References the matched rule IDs
-6. Is forensically specific and evidence-based
-
-Example format: "Provider P90003 exhibits systematic billing fraud through [RULE-ID] violations with daily consecutive billing of CPT codes [codes] totaling $[amount]. Analysis reveals [specific pattern] across [n] claims with [specific deviation]. Estimated overpayment of $[amount]."`;
+Return structured JSON analysis.`;
 
     const message = await anthropic.messages.create({
       model: 'claude-sonnet-4-20250514',
-      max_tokens: 250,
-      temperature: 0.1,
-      messages: [{ role: 'user', content: prompt }],
+      max_tokens: 2000,
+      temperature: 0.3,
+      system: systemPrompt,
+      messages: [{ role: 'user', content: userPrompt }]
     });
 
-    const summary = message.content[0].type === 'text' ? message.content[0].text : 'Analysis pending';
+    const responseText = message.content[0].type === 'text' 
+      ? message.content[0].text 
+      : '';
 
-    const analysis = `<div class='space-y-6'><h2 class='text-2xl font-bold text-gray-900 border-b-2 pb-3 border-purple-200'>Provider: ${lead.provider_id} | ${lead.priority} RISK | Score: ${lead.overallScore.toFixed(1)}/100</h2><div><h3 class='text-xl font-bold text-gray-900 mb-4'>RULE ANOMALIES</h3><table class='w-full border-collapse border border-gray-300 my-6'><thead class='bg-gradient-to-r from-indigo-50 to-purple-50'><tr><th class='border border-gray-300 px-6 py-3 text-left text-xs font-bold text-gray-900 uppercase'>Rule ID</th><th class='border border-gray-300 px-6 py-3 text-left text-xs font-bold text-gray-900 uppercase'>Name</th><th class='border border-gray-300 px-6 py-3 text-left text-xs font-bold text-gray-900 uppercase'>What It Detects</th></tr></thead><tbody>${rulesHTML}</tbody></table></div><div><h3 class='text-xl font-bold text-gray-900 mb-3'>SUMMARY</h3><p class='text-gray-700 leading-relaxed'>${summary}</p></div><div><h3 class='text-xl font-bold text-gray-900 mb-4'>COMPARATIVE ANALYSIS</h3><table class='w-full border-collapse border border-gray-300 my-6'><thead class='bg-gradient-to-r from-indigo-50 to-purple-50'><tr><th class='border border-gray-300 px-6 py-3 text-left text-xs font-bold text-gray-900 uppercase'>Metric</th><th class='border border-gray-300 px-6 py-3 text-left text-xs font-bold text-gray-900 uppercase'>Provider</th><th class='border border-gray-300 px-6 py-3 text-left text-xs font-bold text-gray-900 uppercase'>Peer</th><th class='border border-gray-300 px-6 py-3 text-left text-xs font-bold text-gray-900 uppercase'>Deviation</th></tr></thead><tbody><tr class='hover:bg-gray-50'><td class='border border-gray-300 px-6 py-4'>Claims/month</td><td class='border border-gray-300 px-6 py-4 font-medium'>${Math.round(lead.claimCount/3)}</td><td class='border border-gray-300 px-6 py-4'>15</td><td class='border border-gray-300 px-6 py-4 font-bold text-red-600'>+${Math.round((lead.claimCount/3/15-1)*100)}%</td></tr><tr class='bg-gray-50'><td class='border border-gray-300 px-6 py-4'>Round-$ %</td><td class='border border-gray-300 px-6 py-4 font-medium'>${lead.hasRoundNumbers?'85%':'15%'}</td><td class='border border-gray-300 px-6 py-4'>12%</td><td class='border border-gray-300 px-6 py-4 font-bold text-red-600'>${lead.hasRoundNumbers?'+73pp':'+3pp'}</td></tr><tr><td class='border border-gray-300 px-6 py-4'>Total flagged</td><td class='border border-gray-300 px-6 py-4 font-medium'>$${totalBilled.toLocaleString()}</td><td class='border border-gray-300 px-6 py-4'>$${estimatedPeerTotal.toLocaleString()}</td><td class='border border-gray-300 px-6 py-4 font-bold text-red-600'>+${Math.round((totalBilled/estimatedPeerTotal-1)*100)}%</td></tr></tbody></table></div>${codesHTML?`<div><h3 class='text-xl font-bold text-gray-900 mb-3'>FLAGGED CODES</h3><ul class='space-y-2'>${codesHTML}</ul></div>`:''}<div><h3 class='text-xl font-bold text-gray-900 mb-3 pb-2 border-b border-gray-200'>INVESTIGATION PRIORITY</h3><p class='text-lg font-bold mb-3'>${lead.priority==='HIGH'?'🔴 IMMEDIATE ACTION REQUIRED':lead.priority==='MEDIUM'?'🟡 ESCALATED REVIEW':'🟢 ROUTINE MONITORING'}</p><p class='text-sm text-gray-700 mb-2'><strong>Next Steps:</strong></p><ul class='list-decimal ml-6 text-sm text-gray-700 space-y-1'>${lead.priority==='HIGH'?'<li>Prepayment hold</li><li>Request all medical records</li><li>Schedule site visit within 30 days</li>':lead.priority==='MEDIUM'?'<li>Request sample of 20 claims with documentation</li><li>Review for medical necessity</li><li>90-day enhanced monitoring</li>':'<li>Weekly claims monitoring</li><li>Alert on volume changes >20%</li><li>Quarterly pattern re-assessment</li>'}</ul><p class='mt-4 text-lg'><strong>Estimated Overpayment:</strong> <span class='text-red-600 font-bold'>$${estimatedOverpayment.toLocaleString()}</span></p></div></div>`;
+    // Parse and validate structured output
+    const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) {
+      throw new Error('No JSON found in response');
+    }
 
-    return NextResponse.json({ analysis, matchedRules: lead.matchedRules || [] });
+    const rawAnalysis = JSON.parse(jsonMatch[0]);
+    const validatedAnalysis = LeadAnalysisSchema.parse(rawAnalysis);
+
+    // Format the data for presentation
+    const formattedAnalysis = {
+      summary: validatedAnalysis.summary,
+      
+      comparative_analysis: {
+        claims_per_month: {
+          ...validatedAnalysis.comparative_analysis.claims_per_month,
+          formatted_deviation: formatDeviation(
+            validatedAnalysis.comparative_analysis.claims_per_month.deviation_percent
+          )
+        },
+        round_dollar_percent: {
+          ...validatedAnalysis.comparative_analysis.round_dollar_percent,
+          formatted_deviation: formatDeviation(
+            validatedAnalysis.comparative_analysis.round_dollar_percent.deviation_pp
+          )
+        },
+        total_flagged: {
+          ...validatedAnalysis.comparative_analysis.total_flagged,
+          formatted_deviation: formatDeviation(
+            validatedAnalysis.comparative_analysis.total_flagged.deviation_percent
+          )
+        }
+      },
+      
+      flagged_codes: validatedAnalysis.flagged_codes.map(code => ({
+        ...code,
+        formatted_avg: formatCurrency(code.avg_amount),
+        formatted_total: formatCurrency(code.total_amount)
+      })),
+      
+      priority: formatPriority(validatedAnalysis.priority_level),
+      
+      next_steps: validatedAnalysis.next_steps,
+      
+      estimated_overpayment: validatedAnalysis.estimated_overpayment,
+      formatted_overpayment: formatCurrency(validatedAnalysis.estimated_overpayment)
+    };
+
+    return NextResponse.json({
+      success: true,
+      analysis: formattedAnalysis,
+      raw: validatedAnalysis // For debugging
+    });
+
   } catch (error: any) {
-    console.error('Agent error:', error);
-    return NextResponse.json({ error: error.message }, { status: 500 });
+    console.error('Agent analysis error:', error);
+    return NextResponse.json({
+      success: false,
+      error: error.message
+    }, { status: 500 });
   }
 }
