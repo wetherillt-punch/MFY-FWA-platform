@@ -76,7 +76,7 @@ function detectModifier25Misuse(claims: Claim[]) {
   if (emCodes.length < 10) return null;
 
   const withMod25 = emCodes.filter(c => 
-    c.modifiers && /\b25\b/.test(c.modifiers)
+    c.modifiers && (String(c.modifiers).includes("25") || c.modifiers === 25 || c.modifiers === "25")
   ).length;
 
   const mod25Pct = (withMod25 / emCodes.length) * 100;
@@ -110,7 +110,7 @@ function detectPOSDrift(claims: Claim[]) {
 
   // Check for POS 21 (inpatient hospital) on office codes
   const inpatientPOS = officeVisits.filter(c => 
-    c.place_of_service === '21'
+    String(c.place_of_service) === '21' || c.place_of_service === 21
   ).length;
 
   const posDriftPct = (inpatientPOS / officeVisits.length) * 100;
@@ -166,7 +166,7 @@ function detectPsychotherapyCreep(claims: Claim[]) {
 // Pattern 4: Telehealth Volume Bursts
 function detectTelehealthBursts(claims: Claim[]) {
   // POS 02 = Telehealth
-  const telehealthClaims = claims.filter(c => c.place_of_service === '02');
+  const telehealthClaims = claims.filter(c => String(c.place_of_service) === '02' || c.place_of_service === 2);
 
   if (telehealthClaims.length < 10) return null;
 
