@@ -163,7 +163,7 @@ function detectTimeImpossibilities(claims: Claim[]) {
   const maxDailyHours = maxDailyMinutes / 60;
 
   // Flag if >16 hours of procedures in one day
-  if (maxDailyHours > 16) {
+  if (maxDailyHours > 12) {
     return {
       pattern: 'Time Impossibility',
       description: `${maxDailyHours.toFixed(1)} hours of procedures on ${impossibleDate} (${impossibleCount} procedures)`,
@@ -172,7 +172,7 @@ function detectTimeImpossibilities(claims: Claim[]) {
         date: impossibleDate,
         procedure_count: impossibleCount,
         estimated_hours: maxDailyHours.toFixed(1),
-        maximum_feasible: '16 hours'
+        maximum_feasible: '12 hours'
       },
       weight: 0.9
     };
