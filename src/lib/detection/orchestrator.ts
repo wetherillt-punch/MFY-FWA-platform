@@ -355,8 +355,9 @@ function createEmptyResult(providerId: string): DetectionResult {
     hasModifier59: false,
     hasDailyPattern: false,
     matchedRules: [],
-    advancedPatterns: [],  };
-    phase3Patterns: [],}
+    advancedPatterns: [],
+    phase3Patterns: [],  };
+}
 
 // Legacy export for backwards compatibility
 export const runDetection = runComprehensiveDetection;

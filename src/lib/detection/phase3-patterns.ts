@@ -216,7 +216,7 @@ function detectWoundCareFrequency(claims: Claim[]) {
   // Group by member
   const byMember = new Map<string, Claim[]>();
   woundClaims.forEach(claim => {
-    const member = claim.member_id;
+    const member = claim.member_id || "UNKNOWN";
     if (!byMember.has(member)) byMember.set(member, []);
     byMember.get(member)!.push(claim);
   });
