@@ -73,7 +73,7 @@ function detectModifier25Misuse(claims: Claim[]) {
   // E&M codes that commonly get modifier 25
   const emCodes = claims.filter(c => /^9921[3-5]$/.test(c.cpt_hcpcs));
   
-  if (emCodes.length < 10) return null;
+  if (emCodes.length < 5) return null;
 
   const withMod25 = emCodes.filter(c => 
     c.modifiers && String(c.modifiers).includes("25")
@@ -82,7 +82,7 @@ function detectModifier25Misuse(claims: Claim[]) {
   const mod25Pct = (withMod25 / emCodes.length) * 100;
 
   // Flag if >10% of E&M visits use modifier 25 (expected: <5%)
-  if (mod25Pct > 10) {
+  if (mod25Pct > 8) {
     return {
       pattern: 'Modifier 25 Overuse',
       description: `${mod25Pct.toFixed(0)}% of E&M visits use modifier 25 (expected <5%)`,
@@ -139,7 +139,7 @@ function detectPsychotherapyCreep(claims: Claim[]) {
     /^9083[2347]$/.test(c.cpt_hcpcs)
   );
 
-  if (psychCodes.length < 20) return null;
+  if (psychCodes.length < 10) return null;
 
   // Count 60-min sessions (90837)
   const longSessions = psychCodes.filter(c => c.cpt_hcpcs === '90837').length;
@@ -168,7 +168,7 @@ function detectTelehealthBursts(claims: Claim[]) {
   // POS 02 = Telehealth
   const telehealthClaims = claims.filter(c => ['02', '2', 2].includes(c.place_of_service as any));
 
-  if (telehealthClaims.length < 10) return null;
+  if (telehealthClaims.length < 5) return null;
 
   // Group by date
   const byDate = new Map<string, number>();
@@ -211,7 +211,7 @@ function detectWoundCareFrequency(claims: Claim[]) {
     /^1527[15]$/.test(c.cpt_hcpcs)
   );
 
-  if (woundClaims.length < 5) return null;
+  if (woundClaims.length < 3) return null;
 
   // Group by member
   const byMember = new Map<string, Claim[]>();
