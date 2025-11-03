@@ -6,6 +6,7 @@ import { detectTier4, Tier4Result } from './tier4';
 import { checkCCIEdits } from './cci-edits';
 import { checkLCDLimits, checkMedicalNecessity } from './lcd-limits';
 import { calculatePeerBaselines } from './peer-baselines';
+import { detectAdvancedPatterns } from './advanced-patterns';
 
 export interface DetectionResult {
   provider_id: string;
@@ -27,6 +28,9 @@ export interface DetectionResult {
   tier2Metrics: any[];
   tier3Metrics: any[];
   tier4Metrics: any[];
+  
+  // Advanced patterns
+  advancedPatterns: any[];
   
   // Advanced features
   cciViolations: any[];
@@ -77,6 +81,7 @@ export function runComprehensiveDetection(
   const tier2 = detectTier2(claims, providerId, allProviders);
   const tier3 = detectTier3(claims, providerId);
   const tier4 = detectTier4(claims, providerId);
+  const advancedPatterns = detectAdvancedPatterns(claims, providerId);
 
   // Run advanced checks
   const cciResult = checkCCIEdits(claims, providerId);
@@ -86,9 +91,10 @@ export function runComprehensiveDetection(
 
   // Calculate overall score (weighted)
   const overallScore = 
-    (tier1.score * 0.40) +
-    (tier2.score * 0.35) +
-    (tier3.score * 0.25) +
+    (advancedPatterns.score * 0.15) + 
+    (tier1.score * 0.35) +
+    (tier2.score * 0.30) +
+    (tier3.score * 0.15) +
     (tier4.score * 0.05);
 
   // Determine priority
@@ -148,6 +154,7 @@ export function runComprehensiveDetection(
     tier2Metrics: tier2.metrics,
     tier3Metrics: tier3.metrics,
     tier4Metrics: tier4.metrics,
+    advancedPatterns: advancedPatterns.patterns,
     
     cciViolations: cciResult.violations,
     lcdViolations: lcdResult.violations,
@@ -342,8 +349,8 @@ function createEmptyResult(providerId: string): DetectionResult {
     hasRoundNumbers: false,
     hasModifier59: false,
     hasDailyPattern: false,
-    matchedRules: []
-  };
+    matchedRules: [],
+    advancedPatterns: [],  };
 }
 
 // Legacy export for backwards compatibility

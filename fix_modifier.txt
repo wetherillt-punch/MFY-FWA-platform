@@ -1,0 +1,3 @@
+  const mod59Count = withModifiers.filter(c => 
+    /59|XE|XS|XP|XU/.test(c.modifiers || '')
+  ).length;
