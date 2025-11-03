@@ -15,7 +15,7 @@ export function detectTier2(claims: Claim[], providerId: string, allProviders: s
   const metrics: any[] = [];
   let score = 0;
 
-  if (providerClaims.length < 20) {
+  if (providerClaims.length < 30) {
     return { score: 0, metrics: [] };
   }
 
@@ -57,7 +57,7 @@ export function detectTier2(claims: Claim[], providerId: string, allProviders: s
 
   // 4. CONCENTRATION INDEX
   const gini = calculateGini(providerClaims);
-  if (gini > 0.7) {
+  if (gini > 0.85) {
     score += 60;
     metrics.push({
       metric: 'High Concentration',
@@ -92,7 +92,7 @@ function checkBenfordLaw(claims: Claim[]): { violation: boolean; chiSquare: numb
   }
 
   return {
-    violation: chiSquare > 15.507,
+    violation: chiSquare > 20,
     chiSquare,
     pValue: chiSquare > 15.507 ? 0.01 : 0.5
   };
@@ -150,7 +150,7 @@ function detectSpikes(claims: Claim[]): any {
       amount,
       zScore: stdDev > 0 ? (amount - mean) / stdDev : 0
     }))
-    .filter(s => s.zScore > 3);
+    .filter(s => s.zScore > 4);
 
   if (spikes.length > 0) {
     const maxSpike = spikes[0];
