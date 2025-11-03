@@ -1,0 +1,17 @@
+In src/lib/detection/tier2.ts, find the scoring logic and change:
+
+OLD:
+if (percentile > 90) score += 100;
+else if (percentile > 75) score += 75;
+
+NEW:
+// Only flag extreme outliers (>3 standard deviations)
+if (zScore > 3) score += 100;
+else if (zScore > 2.5) score += 75;
+else if (zScore > 2) score += 50;
+
+Add z-score calculation:
+const mean = peerAmounts.reduce((sum, a) => sum + a, 0) / peerAmounts.length;
+const variance = peerAmounts.reduce((sum, a) => sum + Math.pow(a - mean, 2), 0) / peerAmounts.length;
+const stdDev = Math.sqrt(variance);
+const zScore = (providerAvg - mean) / stdDev;
