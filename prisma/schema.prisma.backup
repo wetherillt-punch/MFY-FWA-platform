@@ -1,0 +1,356 @@
+// FWA Detection Platform Database Schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================================================
+// CORE DATA MODELS
+// ============================================================================
+
+model Claim {
+  id              String   @id @default(cuid())
+  claimId         String   @unique // External claim ID
+  providerId      String
+  serviceDate     DateTime
+  billedAmount    Float
+  
+  // Optional fields
+  paidAmount      Float?
+  memberId        String?
+  providerZip     String?
+  placeOfService  String?
+  serviceDescription String?
+  
+  // Computed/derived fields
+  claimHash       String   // For duplicate detection
+  
+  // Relationships
+  provider        Provider @relation(fields: [providerId], references: [providerId])
+  anomalyTags     ClaimAnomalyTag[]
+  
+  // Metadata
+  datasetId       String
+  dataset         Dataset  @relation(fields: [datasetId], references: [id])
+  createdAt       DateTime @default(now())
+  
+  @@index([providerId])
+  @@index([serviceDate])
+  @@index([claimHash])
+  @@index([datasetId])
+}
+
+model Provider {
+  id              String   @id @default(cuid())
+  providerId      String   @unique // External provider ID
+  
+  // Optional metadata
+  name            String?
+  specialty       String?
+  zip             String?
+  
+  // Relationships
+  claims          Claim[]
+  leads           FWALead[]
+  clusterAssignments ProviderClusterAssignment[]
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  @@index([providerId])
+}
+
+// ============================================================================
+// DETECTION & CLUSTERING
+// ============================================================================
+
+model Dataset {
+  id              String   @id @default(cuid())
+  datasetHash     String   @unique // SHA-256 fingerprint
+  
+  fileName        String?
+  rowCount        Int
+  providerCount   Int
+  dateRangeStart  DateTime
+  dateRangeEnd    DateTime
+  
+  // Quality metrics
+  nullRate        Float
+  duplicateRate   Float
+  invalidDateRate Float
+  qualityScore    Float    // 0-100
+  
+  claims          Claim[]
+  detectionRuns   DetectionRun[]
+  qualityReport   Json?    // Detailed quality report
+  
+  createdAt       DateTime @default(now())
+  
+  @@index([datasetHash])
+}
+
+model DetectionRun {
+  id              String   @id @default(cuid())
+  runId           String   @unique
+  
+  // Versioning
+  codeVersion     String
+  modelVersion    String
+  clusterVersion  String
+  
+  // Configuration
+  config          Json     // Detection thresholds, parameters
+  
+  // Results
+  leadCount       Int
+  highPriorityCount Int
+  mediumPriorityCount Int
+  watchlistCount  Int
+  
+  // Provenance
+  datasetId       String
+  dataset         Dataset  @relation(fields: [datasetId], references: [id])
+  
+  // Relationships
+  leads           FWALead[]
+  clusters        ProviderCluster[]
+  
+  // Timestamps
+  startedAt       DateTime @default(now())
+  completedAt     DateTime?
+  status          RunStatus @default(RUNNING)
+  
+  @@index([runId])
+  @@index([datasetId])
+}
+
+enum RunStatus {
+  RUNNING
+  COMPLETED
+  FAILED
+}
+
+model ProviderCluster {
+  id              String   @id @default(cuid())
+  clusterId       String   // e.g., "C-001"
+  
+  detectionRunId  String
+  detectionRun    DetectionRun @relation(fields: [detectionRunId], references: [id])
+  
+  // Cluster characteristics
+  providerCount   Int
+  avgVolume       Float
+  avgVariance     Float
+  avgBurstiness   Float
+  
+  // Baseline metrics for peer comparison
+  baselineMetrics Json
+  
+  providers       ProviderClusterAssignment[]
+  
+  createdAt       DateTime @default(now())
+  
+  @@unique([detectionRunId, clusterId])
+  @@index([detectionRunId])
+}
+
+model ProviderClusterAssignment {
+  id              String   @id @default(cuid())
+  
+  providerId      String
+  provider        Provider @relation(fields: [providerId], references: [id])
+  
+  clusterId       String
+  cluster         ProviderCluster @relation(fields: [clusterId], references: [id])
+  
+  // Assignment metadata
+  distance        Float    // Distance to cluster center
+  confidence      Float    // 0-1
+  
+  createdAt       DateTime @default(now())
+  
+  @@unique([providerId, clusterId])
+  @@index([providerId])
+  @@index([clusterId])
+}
+
+// ============================================================================
+// FWA LEADS & EXPLAINABILITY
+// ============================================================================
+
+model FWALead {
+  id              String   @id @default(cuid())
+  leadId          String   @unique // User-facing ID
+  
+  providerId      String
+  provider        Provider @relation(fields: [providerId], references: [providerId])
+  
+  detectionRunId  String
+  detectionRun    DetectionRun @relation(fields: [detectionRunId], references: [id])
+  
+  // Scoring
+  overallScore    Float    // 0-100
+  tier1Score      Float
+  tier2Score      Float
+  tier3Score      Float
+  tier4Score      Float
+  
+  priority        LeadPriority
+  
+  // Top-level flags
+  hasTier1        Boolean
+  hasTier2        Boolean
+  hasTier3        Boolean
+  hasTier4        Boolean
+  
+  // Explainability
+  narrative       String   // Human-readable explanation
+  topDrivers      Json     // Array of {metric, providerValue, baseline, peerPercentile, pValue, sampleN}
+  anomalyTags     String[] // e.g., ["round_number_cluster", "burstiness_spike"]
+  
+  // Temporal context
+  analysisWindowStart DateTime
+  analysisWindowEnd   DateTime
+  
+  // Evidence
+  claimCount      Int
+  flaggedClaimIds String[] // Claim IDs that triggered this lead
+  
+  // Trends & visualization data
+  trendData       Json     // For sparklines
+  distributionData Json    // For histograms
+  peerPercentiles Json     // All peer comparisons
+  
+  // Reviewer workflow
+  status          LeadStatus @default(NEW)
+  disposition     LeadDisposition?
+  reviewerNotes   String?
+  reviewedBy      String?
+  reviewedAt      DateTime?
+  
+  // Watchlist
+  onWatchlist     Boolean  @default(false)
+  watchlistAddedAt DateTime?
+  
+  // Escalation tracking
+  escalationCount Int      @default(0)
+  lastEscalatedAt DateTime?
+  
+  // Provenance (embedded)
+  provenance      Json     // {datasetHash, runId, codeVersion, modelVersion, clusterVersion, timestamp}
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  @@index([providerId])
+  @@index([detectionRunId])
+  @@index([priority])
+  @@index([status])
+  @@index([onWatchlist])
+}
+
+enum LeadPriority {
+  HIGH
+  MEDIUM
+  WATCHLIST
+}
+
+enum LeadStatus {
+  NEW
+  UNDER_REVIEW
+  REVIEWED
+  ARCHIVED
+}
+
+enum LeadDisposition {
+  CONFIRMED
+  BENIGN
+  DATA_ISSUE
+  NEEDS_INFO
+}
+
+model ClaimAnomalyTag {
+  id              String   @id @default(cuid())
+  
+  claimId         String
+  claim           Claim    @relation(fields: [claimId], references: [id])
+  
+  // Tag details
+  tag             String   // e.g., "round_number", "duplicate_hash", "spike_day"
+  tier            Int      // 1, 2, 3, or 4
+  confidence      Float    // 0-1
+  
+  // Context
+  metadata        Json?    // Additional tag-specific data
+  
+  createdAt       DateTime @default(now())
+  
+  @@index([claimId])
+  @@index([tag])
+}
+
+// ============================================================================
+// CONFIGURATION & OPERATIONAL CONTEXT
+// ============================================================================
+
+model OperationalContext {
+  id              String   @id @default(cuid())
+  
+  name            String   // e.g., "System Migration Q2 2024"
+  description     String
+  
+  startDate       DateTime
+  endDate         DateTime
+  
+  // Suppression rules
+  suppressAnomalyTags String[] // Tags to suppress during this period
+  annotateOnly    Boolean  @default(false) // If true, annotate but don't flag
+  
+  active          Boolean  @default(true)
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  @@index([startDate, endDate])
+}
+
+// ============================================================================
+// TELEMETRY & EVALUATION
+// ============================================================================
+
+model ReviewerTelemetry {
+  id              String   @id @default(cuid())
+  
+  leadId          String
+  reviewerId      String
+  
+  action          ReviewAction
+  
+  // Timing
+  timeToDisposition Int?   // Seconds from lead creation to disposition
+  
+  // Context
+  metadata        Json?
+  
+  createdAt       DateTime @default(now())
+  
+  @@index([leadId])
+  @@index([reviewerId])
+  @@index([action])
+}
+
+enum ReviewAction {
+  VIEWED
+  OPENED_CLAIMS
+  EXPORTED_PDF
+  EXPORTED_CSV
+  ADDED_TO_WATCHLIST
+  REMOVED_FROM_WATCHLIST
+  SET_DISPOSITION
+  ADDED_NOTE
+}

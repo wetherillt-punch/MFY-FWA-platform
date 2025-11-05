@@ -1,0 +1,167 @@
+// ============================================================================
+// RULES MANAGEMENT SYSTEM - ADD TO END OF YOUR prisma/schema.prisma
+// ============================================================================
+
+model DetectionRule {
+  id          String   @id @default(cuid())
+  name        String
+  description String   @db.Text
+  category    RuleCategory
+  severity    RuleSeverity
+  tier        String   // "tier1", "tier2", "tier3", "dme", "custom"
+  
+  // Built-in vs Custom
+  isBuiltIn   Boolean  @default(false)
+  isActive    Boolean  @default(true)
+  
+  // Rule Configuration
+  cptCodes    String[] // Array of CPT codes to monitor
+  modifiers   String[] // Array of modifiers (e.g., "25", "59")
+  
+  // Thresholds (flexible JSON structure)
+  thresholds  Json     // { maxPerDay: 8, timeWindow: "day", compareToPerAvg: false }
+  
+  // AI-Generated Code
+  generatedCode  String  @db.Text  // TypeScript function code
+  
+  // Approval Workflow (for custom rules)
+  status      RuleStatus  @default(PENDING)
+  approvedBy  String?
+  approvedAt  DateTime?
+  rejectionReason String?
+  
+  // Audit Trail
+  createdBy   String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  // Relations
+  versions    RuleVersion[]
+  tests       RuleTest[]
+  matches     RuleMatch[]
+  validations RuleValidation[]
+  
+  @@index([category])
+  @@index([status])
+  @@index([isBuiltIn])
+  @@index([isActive])
+  @@index([createdBy])
+}
+
+model RuleVersion {
+  id          String   @id @default(cuid())
+  ruleId      String
+  rule        DetectionRule @relation(fields: [ruleId], references: [id], onDelete: Cascade)
+  
+  version     Int
+  changes     Json     // What changed in this version
+  
+  createdBy   String
+  createdAt   DateTime @default(now())
+  
+  @@unique([ruleId, version])
+  @@index([ruleId])
+}
+
+model RuleTest {
+  id             String   @id @default(cuid())
+  ruleId         String
+  rule           DetectionRule @relation(fields: [ruleId], references: [id], onDelete: Cascade)
+  
+  // Test Data
+  testDataFile   String   // Name of file used for testing
+  totalClaims    Int      // Total claims analyzed
+  matchesFound   Int      // Total matches/violations found
+  executionTime  Float    // Seconds to execute
+  
+  // Results
+  results        Json     // Detailed match results
+  insights       Json?    // AI-generated insights about rule performance
+  
+  // Metrics
+  precision      Float?   // Estimated precision (0-100)
+  falsePositiveRate Float? // Estimated false positive rate
+  
+  createdAt      DateTime @default(now())
+  
+  @@index([ruleId])
+  @@index([createdAt])
+}
+
+model RuleMatch {
+  id          String   @id @default(cuid())
+  ruleId      String
+  rule        DetectionRule @relation(fields: [ruleId], references: [id], onDelete: Cascade)
+  
+  // Match Details
+  providerId  String
+  providerName String?
+  claimIds    String[] // Claims that triggered this match
+  matchDate   DateTime // Date of the violation
+  severity    RuleSeverity
+  
+  // Match Metadata
+  metadata    Json     // Additional details (CPT breakdown, amounts, etc.)
+  riskScore   Int?     // 0-100 risk score
+  
+  // Validation Status
+  isValidated Boolean  @default(false)
+  isFraud     Boolean? // True if confirmed fraud, false if false positive
+  validatedBy String?
+  validatedAt DateTime?
+  
+  createdAt   DateTime @default(now())
+  
+  @@index([ruleId])
+  @@index([providerId])
+  @@index([matchDate])
+  @@index([isValidated])
+}
+
+model RuleValidation {
+  id          String   @id @default(cuid())
+  ruleId      String
+  rule        DetectionRule @relation(fields: [ruleId], references: [id], onDelete: Cascade)
+  
+  matchId     String   // References RuleMatch.id
+  
+  // Validation
+  isFraud     Boolean  // User's determination
+  confidence  Int      // User's confidence 0-100
+  notes       String?  @db.Text
+  
+  validatedBy String
+  validatedAt DateTime @default(now())
+  
+  @@index([ruleId])
+  @@index([matchId])
+  @@index([validatedAt])
+}
+
+// ============================================================================
+// ENUMS FOR RULES SYSTEM
+// ============================================================================
+
+enum RuleCategory {
+  BILLING
+  TEMPORAL
+  DME
+  NETWORK
+  BEHAVIORAL
+  CUSTOM
+}
+
+enum RuleSeverity {
+  HIGH
+  MEDIUM
+  LOW
+}
+
+enum RuleStatus {
+  PENDING      // Custom rule awaiting approval
+  APPROVED     // Custom rule approved by admin
+  REJECTED     // Custom rule rejected
+  ACTIVE       // Rule is live
+  DISABLED     // Rule is temporarily disabled
+  ARCHIVED     // Rule is deprecated
+}
