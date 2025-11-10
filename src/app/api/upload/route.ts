@@ -24,14 +24,17 @@ export async function POST(request: NextRequest) {
       claim_id: String(row.claim_id || row.CLAIM_ID || ''),
       provider_id: String(row.provider_id || row.PROVIDER_ID || ''),
       member_id: String(row.member_id || row.MEMBER_ID || ''),
-      service_date: normalizeDateToYYYYMMDD(row.service_date || row.SERVICE_DATE || ''),
-      billed_amount: String(row.billed_amount || row.BILLED_AMOUNT || '0'),
-      paid_amount: String(row.paid_amount || row.PAID_AMOUNT || ''),
-      cpt_hcpcs: String(row.cpt_hcpcs || row.CPT_HCPCS || row.code || ''),
-      cpt_description: String(row.cpt_description || row.CPT_DESCRIPTION || row.description || ''),
-      modifiers: String(row.modifier || row.modifiers || row.MODIFIER || row.MODIFIERS || ''),
+      service_date: new Date(row.service_date || row.SERVICE_DATE),  // ← Convert to Date
+      billed_date: row.billed_date ? new Date(row.billed_date) : undefined,
+      paid_date: row.paid_date ? new Date(row.paid_date) : undefined,
       place_of_service: String(row.place_of_service || row.PLACE_OF_SERVICE || ''),
-      diagnosis_code: String(row.diagnosis_code || row.DIAGNOSIS_CODE || '')
+      cpt_hcpcs: row.cpt_hcpcs || row.CPT_HCPCS,
+      modifiers: row.modifiers || row.MODIFIERS,
+      billed_amount: Number(row.billed_amount || row.BILLED_AMOUNT || 0),
+      paid_amount: row.paid_amount ? Number(row.paid_amount) : undefined,
+      claim_type: row.claim_type || row.CLAIM_TYPE,
+      serial_number: row.serial_number || row.SERIAL_NUMBER,
+      paid_status: row.paid_status || row.PAID_STATUS,
     }));
 
     const validClaims = claims.filter(c => 
