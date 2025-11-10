@@ -149,8 +149,8 @@ function detectTimeImpossibilities(claims: Claim[]) {
   let impossibleCount = 0;
 
   byDate.forEach((dayClaims, date) => {
+    return sum + (claim.cpt_hcpcs ? (procedureTimes[claim.cpt_hcpcs] || 10) : 10);
     const totalMinutes = dayClaims.reduce((sum, claim) => {
-      return sum + (procedureTimes[claim.cpt_hcpcs] || 10);
     }, 0);
 
     if (totalMinutes > maxDailyMinutes) {
