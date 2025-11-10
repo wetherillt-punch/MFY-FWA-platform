@@ -137,7 +137,7 @@ export function runComprehensiveDetection(
 
   // Calculate totals
   const totalBilled = providerClaims.reduce((sum, c) => 
-    sum + parseFloat(c.billed_amount || '0'), 0
+    sum + (c.billed_amount || 0), 0
   );
 
   // Analyze top codes
