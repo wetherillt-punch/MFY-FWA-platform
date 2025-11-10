@@ -1,4 +1,4 @@
-import { Claim } from '@/types/detection';
+import { Claim } from '@/types';
 import { detectTier1, Tier1Result } from './tier1';
 import { detectTier2, Tier2Result } from './tier2';
 import { detectTier3, Tier3Result } from './tier3';

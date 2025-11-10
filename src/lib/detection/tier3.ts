@@ -1,4 +1,4 @@
-import { Claim } from '@/types/detection';
+import { Claim } from '@/types';
 
 export interface Tier3Result {
   score: number;

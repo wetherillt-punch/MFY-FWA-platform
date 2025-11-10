@@ -1,4 +1,4 @@
-import { Claim } from '@/types/detection';
+import { Claim } from '@/types';
 import { runDMEDetection } from './dme/dme-detection-engine';
 
 
