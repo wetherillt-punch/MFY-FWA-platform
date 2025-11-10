@@ -126,7 +126,7 @@ function detectTimeImpossibilities(claims: Claim[]) {
   // Group claims by date
   const byDate = new Map<string, Claim[]>();
   claims.forEach(claim => {
-    const date = claim.service_date;
+    const date = claim.service_date.toISOString().split('T')[0];
     if (!byDate.has(date)) byDate.set(date, []);
     byDate.get(date)!.push(claim);
   });
