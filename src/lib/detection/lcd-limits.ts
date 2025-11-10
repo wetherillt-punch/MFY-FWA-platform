@@ -143,7 +143,7 @@ export function checkMedicalNecessity(claims: Claim[], providerId: string): {
 
   // Check for daily wound care (medically impossible - needs 21+ day healing)
   const woundCareCodes = ['15275', '15276', 'Q4101', 'Q4110', '11042', '11043', '11044'];
-  const woundClaims = providerClaims.filter(c => woundCareCodes.includes(c.cpt_hcpcs));
+  const woundClaims = providerClaims.filter(c => c.cpt_hcpcs && woundCareCodes.includes(c.cpt_hcpcs));
   
   if (woundClaims.length > 0) {
     // Check for consecutive days
