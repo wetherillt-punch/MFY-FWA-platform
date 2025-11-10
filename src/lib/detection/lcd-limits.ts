@@ -115,7 +115,7 @@ export function checkLCDLimits(claims: Claim[], providerId: string): {
           frequency: claimsInWindow.length,
           maxAllowed: limit.maxPerPeriod,
           periodDays: limit.periodDays,
-          dates: claimsInWindow.map(c => c.service_date.split('T')[0]),
+          dates: claimsInWindow.map(c => c.service_date.toISOString().split('T')[0]),
           severity: claimsInWindow.length > limit.maxPerPeriod * 2 ? 'critical' : 'high'
         });
         break; // Found violation for this code
