@@ -193,9 +193,7 @@ export default function AnalysisDisplay({ analysis }: AnalysisDisplayProps) {
                       ? 'text-red-600' 
                       : 'text-green-600'
                   }`}>
-                    {typeof analysis.comparative_analysis.total_flagged.formatted_deviation === 'object'
-                      ? analysis.comparative_analysis.total_flagged.formatted_deviation.label
-                      : analysis.comparative_analysis.total_flagged.formatted_deviation}
+                   {analysis.comparative_analysis.total_flagged.formatted_deviation}
                   </span>
                 </td>
               </tr>
