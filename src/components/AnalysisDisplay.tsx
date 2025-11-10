@@ -272,7 +272,7 @@ export default function AnalysisDisplay({ analysis }: AnalysisDisplayProps) {
                           className="flex items-center gap-2 text-sm font-medium text-gray-900 hover:text-gray-700"
                         >
                           {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-                          View Supporting Claims ({rule.claims.length})
+                          View Supporting Claims ({rule.claims?.length || 0})
                         </button>
                       </div>
 
