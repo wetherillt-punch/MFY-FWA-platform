@@ -105,6 +105,8 @@ export interface ClaimData {
   paid_status?: string;
 }
 
+export type Claim = ClaimData;
+
 export interface ClaimWithHash extends ClaimData {
   claim_hash: string;
 }
