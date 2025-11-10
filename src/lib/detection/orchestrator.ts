@@ -151,7 +151,7 @@ export function runComprehensiveDetection(
   );
 
   // Detect patterns
-  const amounts = providerClaims.map(c => parseFloat(c.billed_amount || '0'));
+  const amounts = providerClaims.map(c => c.billed_amount || 0);
   const roundCount = amounts.filter(a => a % 100 === 0).length;
   const hasRoundNumbers = (roundCount / amounts.length) > 0.5;
   const hasModifier59 = cciResult.modifier59Rate > 0.4;
