@@ -8,6 +8,9 @@ export async function POST() {
     console.log('Generating synthetic dataset...');
     const claims = generateSyntheticDataset(50, 10); // 50 normal, 10 anomalous providers
     
+    // Extract unique providers from claims
+    const providers = Array.from(new Set(claims.map(c => c.provider_id)));
+
     // Run detection
     console.log('Running detection...');
     const leads = await runDetection(claims, providers, allClaims);
