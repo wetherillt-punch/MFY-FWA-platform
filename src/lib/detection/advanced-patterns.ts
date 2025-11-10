@@ -70,7 +70,7 @@ function detectUpcoding(claims: Claim[]) {
   
   if (emCodes.length < 10) return null; // Need sample size
 
-  const level4_5 = emCodes.filter(c => /^9921[45]$/.test(c.cpt_hcpcs)).length;
+  const level4_5 = emCodes.filter(c => c.cpt_hcpcs &&  /^9921[45]$/.test(c.cpt_hcpcs)).length;
   const highLevelPct = (level4_5 / emCodes.length) * 100;
 
   // Flag if >75% are level 4/5 (normal is ~40-50%)
