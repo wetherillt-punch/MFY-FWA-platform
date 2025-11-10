@@ -10,7 +10,7 @@ export async function POST() {
     
     // Run detection
     console.log('Running detection...');
-    const leads = await runDetection(claims);
+    const leads = await runDetection(claims, providers, allClaims);
     
     // Calculate stats
     const highPriorityCount = leads.filter(l => l.priority === 'HIGH').length;
