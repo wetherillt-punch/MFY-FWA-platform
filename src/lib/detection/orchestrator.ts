@@ -210,7 +210,7 @@ function analyzeTopCodes(claims: Claim[]) {
   if (code && !codeMap.has(code)) {
     codeMap.set(code, {
         code,
-        description: claim.cpt_description || code,    
+        description: code,    
         count: 0,
         totalBilled: 0,
         amounts: [],
