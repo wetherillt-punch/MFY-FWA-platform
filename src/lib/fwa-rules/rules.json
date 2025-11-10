@@ -1,0 +1,243 @@
+{
+  "meta": {
+    "version": "2.0",
+    "date_created": "2025-11-01",
+    "scoring_formula": "0.4*Deterministic + 0.4*PeerOutlier + 0.2*Novelty",
+    "classification": {
+      "high_risk": ">70",
+      "medium_risk": "50-70",
+      "watchlist": "<50"
+    }
+  },
+  
+  "peer_baselines": {
+    "modifier_59_usage": {
+      "general": 8,
+      "pain_management": 12,
+      "surgery": 15
+    },
+    "round_number_pct": {
+      "all_specialties": 12,
+      "wound_care": 10,
+      "dme": 15
+    },
+    "frequency": {
+      "wound_care_per_quarter": 2,
+      "injections_per_month": 4,
+      "healing_interval_days": 21
+    },
+    "avg_amounts": {
+      "office_visit": 180,
+      "wound_care": 850,
+      "pain_injection": 1200,
+      "skin_substitute": 950
+    }
+  },
+
+  "rules": [
+    {
+      "rule_id": "R-WOUND-001",
+      "version": "1.0",
+      "name": "Daily Wound Care / Skin Substitute Billing",
+      "category": "medical_impossibility",
+      "severity": "critical",
+      "weight": 0.9,
+      "codes_targeted": ["15271", "15275", "15276", "Q4101", "Q4110"],
+      "logic": "If wound care codes billed on 5+ consecutive days with 80%+ round-dollar amounts, flag as medically implausible",
+      "thresholds": {
+        "soft": {
+          "consecutive_days": 5,
+          "round_pct": 80
+        },
+        "hard": {
+          "consecutive_days": 10,
+          "round_pct": 100
+        }
+      },
+      "peer_baseline": {
+        "frequency_per_patient_per_year": 2,
+        "interval_days": 21,
+        "avg_amount": 850
+      },
+      "medical_standard": "Skin grafts require 14-28 days healing between applications to same site",
+      "detection_signals": ["hasDailyPattern", "hasRoundNumbers", "hasWoundCareCodes"],
+      "explain_short": "Daily consecutive skin graft billing (medically impossible)",
+      "explain_deep": "Provider billed wound care codes {codes} on {n} consecutive days totaling ${amount}. Medical standard requires 14-28 day healing intervals. Peer baseline: {peer_freq} per patient per year.",
+      "investigation_steps": [
+        "Request wound bed photographs with measurements for each date",
+        "Verify distinct anatomical sites if multiple same-day grafts",
+        "Review treatment plans and medical necessity documentation",
+        "Check for duplicate billing to same member"
+      ],
+      "false_positive_indicators": [
+        "Multiple distinct wound sites documented",
+        "Burn unit or trauma specialty",
+        "Complex wound care management program"
+      ]
+    },
+
+    {
+      "rule_id": "R-MOD59-001",
+      "version": "1.0",
+      "name": "Modifier-59 Systematic Unbundling",
+      "category": "unbundling",
+      "severity": "critical",
+      "weight": 0.85,
+      "codes_targeted": ["64483", "64484", "99152", "99153"],
+      "logic": "If modifier-59 used on >60% of claims when peer baseline is 8-15%, flag systematic unbundling",
+      "thresholds": {
+        "soft": {
+          "modifier_59_pct": 60
+        },
+        "hard": {
+          "modifier_59_pct": 80
+        }
+      },
+      "peer_baseline": {
+        "modifier_59_rate_general": 8,
+        "modifier_59_rate_pain_mgmt": 12,
+        "modifier_59_rate_surgery": 15
+      },
+      "common_patterns": {
+        "pain_management": ["64483", "64484", "99152"],
+        "surgery": ["separate_incision_codes"]
+      },
+      "detection_signals": ["hasModifier59"],
+      "explain_short": "Systematic use of modifier-59 to unbundle services",
+      "explain_deep": "Provider uses modifier-59 on {pct}% of claims vs peer baseline {peer_pct}%. Pattern indicates unbundling of add-on or bundled services. Common combinations: {codes}.",
+      "investigation_steps": [
+        "Review operative notes for distinct procedures",
+        "Verify separate anatomical sites justify modifier-59",
+        "Check time separation between procedures",
+        "Compare to CCI edits and bundling rules"
+      ],
+      "bundling_rules": "Sedation (99152) typically bundled with procedure payment. Add-on codes (64484) should only use -59 for anatomically distinct sites."
+    },
+
+    {
+      "rule_id": "R-ROUND-001",
+      "version": "1.0",
+      "name": "Round-Number Anchoring",
+      "category": "billing_pattern",
+      "severity": "medium",
+      "weight": 0.4,
+      "codes_targeted": ["all"],
+      "logic": "If 25%+ of billed amounts are round numbers (end in 00 or 000), above peer baseline of 12%, flag cognitive bias or template billing",
+      "thresholds": {
+        "soft": {
+          "round_pct": 25
+        },
+        "hard": {
+          "round_pct": 50
+        }
+      },
+      "peer_baseline": {
+        "round_pct_all_specialties": 12,
+        "round_pct_wound_care": 10,
+        "round_pct_dme": 15
+      },
+      "detection_signals": ["hasRoundNumbers"],
+      "explain_short": "Excessive round-dollar amounts indicate template billing",
+      "explain_deep": "Round-number frequency {pct}% vs peer {peer_pct}%. Real medical billing varies by time, supplies, complexity. Perfect uniformity suggests fabricated charges or cognitive anchoring.",
+      "investigation_steps": [
+        "Request itemized invoices showing time/supply breakdown",
+        "Compare to contracted fee schedules",
+        "Review for copy-paste documentation patterns"
+      ]
+    },
+
+    {
+      "rule_id": "R-VOLUME-001",
+      "version": "1.0",
+      "name": "Impossible Service Volume",
+      "category": "volume",
+      "severity": "high",
+      "weight": 0.7,
+      "codes_targeted": ["all"],
+      "logic": "If provider bills >100 claims/month or >10 per day sustained, flag volume anomaly",
+      "thresholds": {
+        "soft": {
+          "claims_per_month": 80,
+          "claims_per_day": 8
+        },
+        "hard": {
+          "claims_per_month": 100,
+          "claims_per_day": 10
+        }
+      },
+      "peer_baseline": {
+        "claims_per_month": 40,
+        "claims_per_day": 2
+      },
+      "detection_signals": ["highVolume"],
+      "explain_short": "Claim volume exceeds physically possible service capacity",
+      "explain_deep": "Provider averages {claims_per_day} claims/day vs peer {peer_claims_per_day}. Sustained high volume may indicate auto-submission, cloning, or fabrication.",
+      "investigation_steps": [
+        "Review appointment logs vs billed dates",
+        "Check for duplicate member IDs on same dates",
+        "Verify provider credentials and license status",
+        "Conduct site visit to confirm capacity"
+      ]
+    },
+
+    {
+      "rule_id": "R-MOD25-001",
+      "version": "1.0",
+      "name": "Same-Day E/M with Procedure (-25)",
+      "category": "modifier_abuse",
+      "severity": "medium-high",
+      "weight": 0.6,
+      "codes_targeted": ["99213", "99214", "99215"],
+      "logic": "If E/M codes with modifier-25 paired with procedures same-day at >3x peer rate, flag potential unbundling",
+      "thresholds": {
+        "soft": {
+          "rate_ratio": 3.0
+        },
+        "hard": {
+          "rate_ratio": 5.0
+        }
+      },
+      "peer_baseline": {
+        "mod25_rate": 15
+      },
+      "detection_signals": ["hasMod25Pattern"],
+      "explain_short": "Excessive same-day E/M billing with procedures",
+      "explain_deep": "Provider bills E/M with -25 at {rate}% vs peer {peer_rate}%. May indicate billing for E/M already included in procedure global period.",
+      "investigation_steps": [
+        "Verify E/M documentation shows separate, identifiable service",
+        "Check for distinct history, exam, and MDM",
+        "Review for preventive service exceptions"
+      ]
+    },
+
+    {
+      "rule_id": "R-UPCODING-001",
+      "version": "1.0",
+      "name": "E/M Level Upcoding",
+      "category": "upcoding",
+      "severity": "medium",
+      "weight": 0.5,
+      "codes_targeted": ["99214", "99215"],
+      "logic": "If high-level E/M codes (99214-99215) represent >70% of visits vs peer 30%, flag upcoding",
+      "thresholds": {
+        "soft": {
+          "high_level_pct": 60
+        },
+        "hard": {
+          "high_level_pct": 70
+        }
+      },
+      "peer_baseline": {
+        "level_4_5_pct": 30
+      },
+      "detection_signals": ["hasUpcodingPattern"],
+      "explain_short": "Disproportionate billing of high-complexity E/M codes",
+      "explain_deep": "Provider bills level 4-5 E/M at {pct}% vs peer {peer_pct}%. Pattern suggests systematic upcoding without corresponding clinical complexity.",
+      "investigation_steps": [
+        "Audit documentation for MDM complexity",
+        "Verify time documentation if time-based billing",
+        "Compare diagnosis codes to billed levels"
+      ]
+    }
+  ]
+}

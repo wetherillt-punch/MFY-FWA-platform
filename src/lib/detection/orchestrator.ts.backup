@@ -94,36 +94,18 @@ export function runComprehensiveDetection(
 
   // Calculate overall score (weighted)
   const overallScore = 
-    (advancedPatterns.score * 0.08) +
-    (phase3Patterns.score * 0.20) +  // Increased from 0.10 for DME rules
-    (tier1.score * 0.28) +
-    (tier2.score * 0.22) +
+    (advancedPatterns.score * 0.10) +
+    (phase3Patterns.score * 0.10) + 
+    (tier1.score * 0.30) +
+    (tier2.score * 0.25) +
     (tier3.score * 0.15) +
     (tier4.score * 0.05);
 
-  // Determine priority - balanced to catch real fraud without noise
+  // Determine priority
   let priority: 'HIGH' | 'MEDIUM' | 'WATCHLIST' = 'WATCHLIST';
-  
-  // Check for high-severity phase3 patterns (DME Tier A rules)
-  const hasHighSeverityDME = phase3Patterns.patterns.some(
-    (p: any) => p.severity === 'high' || p.tier === 'A'
-  );
-  
-  // HIGH Priority Logic:
-  // 1. Strong traditional tier scores
-  if ((tier1.score > 70 || tier2.score > 70) && overallScore >= 55) {
+  if ((tier1.score > 70 || tier2.score > 70) && overallScore >= 60) {
     priority = 'HIGH';
-  }
-  // 2. DME Tier A rules (high-confidence fraud patterns)
-  else if (hasHighSeverityDME && phase3Patterns.score >= 50) {
-    priority = 'HIGH';
-  }
-  // 3. Multiple supporting violations
-  else if (overallScore >= 60 && (tier1.score + tier2.score) > 120) {
-    priority = 'HIGH';
-  }
-  // MEDIUM: Moderate scores or single-tier flags
-  else if (overallScore >= 40 || tier3.score > 60 || tier2.score > 65) {
+  } else if (overallScore >= 45 || tier3.score > 60) {
     priority = 'MEDIUM';
   }
 

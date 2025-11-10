@@ -1,113 +1,78 @@
 // ============================================================================
-// DETECTION CONFIGURATION TYPES
-// ============================================================================
-
-export interface DetectionConfig {
-  // Tier 1: Hard Rules
-  duplicateThreshold: number;
-  roundNumberThreshold: number;
-  holidayMultiplier: number;
-  
-  // Tier 2: Statistical Outliers
-  zScoreThreshold: number;
-  benfordMinSampleSize: number;
-  benfordChiSquareAlpha: number;
-  giniThreshold: number;
-  peerOutlierPercentile: number;
-  
-  // Tier 3: Behavioral Patterns
-  claimSplittingMinCount: number;
-  anchoringMinRepeats: number;
-  changePointMinJump: number;
-  modifier25Threshold: number;
-  
-  // Tier 4: Watchlist
-  driftThreshold: number;
-  minSampleSize: number;
-  trendSignificance: number;
-  
-  // Scoring Thresholds
-  threshold_high: number;
-  threshold_medium: number;
-  threshold_watchlist: number;
-  minScore: number;
-  
-  // Filtering (NEW)
-  minClaimsForDetection: number;
-  suppressTier4Only: boolean;
-  
-  // Weights (NEW)
-  tier1Weight: number;
-  tier2Weight: number;
-  tier3Weight: number;
-  tier4Weight: number;
-}
-
-export const DEFAULT_DETECTION_CONFIG: DetectionConfig = {
-  // Tier 1: Hard Rules (Critical Violations)
-  duplicateThreshold: 2,
-  roundNumberThreshold: 0.6,
-  holidayMultiplier: 2.5,
-  
-  // Tier 2: Statistical Outliers (Peer Comparison)
-  zScoreThreshold: 3.5,
-  benfordMinSampleSize: 300,
-  benfordChiSquareAlpha: 0.01,
-  giniThreshold: 0.85,
-  peerOutlierPercentile: 98,
-  
-  // Tier 3: Behavioral Patterns (Clinical Abuse)
-  claimSplittingMinCount: 8,
-  anchoringMinRepeats: 15,
-  changePointMinJump: 0.6,
-  modifier25Threshold: 0.12,
-  
-  // Tier 4: Watchlist (Gradual Drift)
-  driftThreshold: 0.35,
-  minSampleSize: 50,
-  trendSignificance: 0.01,
-  
-  // Scoring Thresholds
-  threshold_high: 75,
-  threshold_medium: 55,
-  threshold_watchlist: 45,
-  minScore: 40,
-  
-  // Filtering
-  minClaimsForDetection: 30,
-  suppressTier4Only: true,
-  
-  // Weights
-  tier1Weight: 1.0,
-  tier2Weight: 0.8,
-  tier3Weight: 0.6,
-  tier4Weight: 0.3,
-};
-
-// ============================================================================
-// CLAIM DATA TYPES
+// CORE DATA TYPES
 // ============================================================================
 
 export interface ClaimData {
   claim_id: string;
   provider_id: string;
-  member_id: string;
-  service_date: Date;
-  billed_date?: Date;
-  paid_date?: Date;
-  place_of_service: string;
-  cpt_hcpcs?: string;
-  modifiers?: string;
+  service_date: Date | string;
   billed_amount: number;
+  
+  // Optional fields
   paid_amount?: number;
-  claim_type?: string;
-  serial_number?: string;
-  paid_status?: string;
+  member_id?: string;
+  provider_zip?: string;
+  place_of_service?: string;
+  service_description?: string;
 }
 
 export interface ClaimWithHash extends ClaimData {
   claim_hash: string;
+  service_date: Date;
 }
+
+// ============================================================================
+// DETECTION TYPES
+// ============================================================================
+
+export interface DetectionConfig {
+  // Tier 1 thresholds
+  roundNumberThreshold: number;        // % of .00 amounts to flag
+  holidayConcentrationThreshold: number;
+  
+  // Tier 2 thresholds
+  zScoreThreshold: number;             // For burstiness detection
+  benfordMinSampleSize: number;        // Minimum claims for Benford test
+  benfordPValueThreshold: number;
+  peerOutlierPercentile: number;       // Top X% vs peers
+  
+  // Tier 3 thresholds
+  claimSplittingWindowDays: number;
+  anchoringMinRepeats: number;
+  changePointMinMagnitude: number;
+  
+  // Tier 4 thresholds
+  driftThreshold: number;
+  
+  // Peer grouping
+  minClusterSize: number;              // Minimum providers per cluster
+  
+  // Scoring
+  threshold_high: number;              // Score threshold for HIGH priority
+  threshold_medium: number;            // Score threshold for MEDIUM priority
+  
+  // Persistence
+  persistenceRunsRequired: number;     // Runs before escalation
+  quietRunsRequired: number;           // Quiet runs before de-escalation
+}
+
+export const DEFAULT_DETECTION_CONFIG: DetectionConfig = {
+  roundNumberThreshold: 0.5,
+  holidayConcentrationThreshold: 2.0,
+  zScoreThreshold: 3.0,
+  benfordMinSampleSize: 300,
+  benfordPValueThreshold: 0.01,
+  peerOutlierPercentile: 2.5,
+  claimSplittingWindowDays: 7,
+  anchoringMinRepeats: 10,
+  changePointMinMagnitude: 0.3,
+  driftThreshold: 0.15,
+  minClusterSize: 20,
+  threshold_high: 70,
+  threshold_medium: 50,
+  persistenceRunsRequired: 2,
+  quietRunsRequired: 2,
+};
 
 // ============================================================================
 // ANOMALY DETECTION RESULTS
@@ -123,8 +88,6 @@ export interface AnomalyMetric {
   sampleN: number;
   tier: 1 | 2 | 3 | 4;
   anomalyTag: string;
-  flaggedClaimIds?: string[];  // ✅ ADD THIS LINE
-  flaggedClaims?: any[];       // ✅ ADD THIS LINE (for actual claim data)
 }
 
 export interface ProviderAnomalyResult {
@@ -183,7 +146,7 @@ export interface TopDriver {
   pValue?: number;
   effectSize?: number;
   sampleN: number;
-  interpretation: string;
+  interpretation: string; // Human-readable description
 }
 
 export interface LeadNarrative {
@@ -208,7 +171,7 @@ export interface ProviderFeatures {
   roundNumberShare: number;
   benfordDeviation: number;
   weekendShare: number;
-  monthlyPattern: number[];
+  monthlyPattern: number[]; // 12 values for seasonality
 }
 
 export interface ClusterResult {
@@ -260,8 +223,8 @@ export interface PDFExportData {
   priority: string;
   narrative: LeadNarrative;
   topDrivers: TopDriver[];
-  trendChart: string;
-  distributionChart: string;
+  trendChart: string; // Base64 image
+  distributionChart: string; // Base64 image
   peerPercentiles: Record<string, number>;
   claims: ClaimData[];
   runId: string;

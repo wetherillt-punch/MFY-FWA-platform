@@ -7,13 +7,6 @@ import { useRouter } from 'next/navigation';
 export default function Dashboard() {
   const [uploading, setUploading] = useState(false);
   const [data, setData] = useState<any>(null);
-   useEffect(() => {
-   const stored = sessionStorage.getItem('fwa_results');
-   if (stored) {
-    const restoredData = JSON.parse(stored);
-    setData(restoredData);
-  }
-}, []);
   const [error, setError] = useState<string | null>(null);
   const resultsRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
@@ -46,10 +39,7 @@ export default function Dashboard() {
       })
       .then(result => {
         console.log('Upload successful:', result);
-        console.log('Detection object:', result.detection);
-        console.log('Leads array:', result.detection?.leads);
         setData(result);
-        sessionStorage.setItem('fwa_results', JSON.stringify(result));
         setUploading(false);
       })
       .catch(err => {
@@ -65,37 +55,33 @@ export default function Dashboard() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const handleViewDetails = (providerId: string) => {
-    if (data) {
-      // âœ… Extract claims from correct path (detection.allClaims)
-      const allClaims = data.detection?.allClaims || [];
-      
-      const results = {
-        detection: {
-          leads: data.detection?.leads || []
-        },
-        fileName: data.fileName || 'unknown',
-        allClaims: allClaims
-      };
-      
-      console.log('ðŸ"¦ Storing results:', {
-        leadCount: results.detection.leads.length,
-        claimCount: results.allClaims.length,
-        fileName: results.fileName
-      });
-      
-      // Store in both formats for compatibility
-      sessionStorage.setItem('fwa_results', JSON.stringify(results));
-      sessionStorage.setItem('detectionResults', JSON.stringify(data));
-    }
-    router.push(`/leads/${providerId}`);
-  };
+const handleViewDetails = (providerId: string) => {
+  if (data) {
+    // Get all claims from the upload result
+    const allClaims = data.parseResult?.claims || data.claims || [];
+    
+    const results = {
+      leads: detection.leads,
+      fileName: data.fileName,
+      allClaims: allClaims  // ✅ Store all claims
+    };
+    
+    console.log('📦 Storing results:', {
+      leadCount: results.leads.length,
+      claimCount: results.allClaims.length,
+      fileName: results.fileName
+    });
+    
+    sessionStorage.setItem('fwa_results', JSON.stringify(results));
+  }
+  router.push(`/leads/${providerId}`);
+};
 
-  const leads = data?.detection?.leads || [];
   const detection = data?.detection || {};
   const qualityReport = data?.qualityReport || {};
+  const leads = detection.leads || [];
   const totalProviders = 68;
-  const leadCount = data?.detection?.leads?.length || 0;
+  const leadCount = detection.leadCount || leads.length;
 
   if (!data) {
     return (
@@ -138,10 +124,10 @@ export default function Dashboard() {
           <div className="mt-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
             <p className="text-sm font-medium text-blue-900 mb-2">Required columns:</p>
             <ul className="text-sm text-blue-700 space-y-1">
-              <li> <strong>claim_id</strong> - Unique claim identifier</li>
-              <li> <strong>provider_id</strong> - Provider identifier</li>
-              <li> <strong>service_date</strong> - Date of service</li>
-              <li> <strong>billed_amount</strong> - Billed amount</li>
+              <li>• <strong>claim_id</strong> - Unique claim identifier</li>
+              <li>• <strong>provider_id</strong> - Provider identifier</li>
+              <li>• <strong>service_date</strong> - Date of service</li>
+              <li>• <strong>billed_amount</strong> - Billed amount</li>
             </ul>
           </div>
         </div>
@@ -152,6 +138,13 @@ export default function Dashboard() {
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <div className="mb-8">
+        <button
+          onClick={handleNewUpload}
+          className="flex items-center text-blue-600 hover:text-blue-800 font-medium mb-4 transition"
+        >
+          <ArrowLeft className="h-4 w-4 mr-2" />
+          Upload New File
+        </button>
         <h1 className="text-3xl font-bold text-gray-900">FWA Detection Results</h1>
         <p className="mt-2 text-sm text-gray-600">
           File: {data.fileName} | Found <strong>{leadCount}</strong> FWA leads out of <strong>{totalProviders}</strong> providers
@@ -208,7 +201,7 @@ export default function Dashboard() {
         <div className="px-6 py-5 border-b border-gray-200">
           <h2 className="text-xl font-semibold text-gray-900">Flagged Providers</h2>
           <p className="text-sm text-gray-600 mt-1">
-            Sorted by priority (HIGH’ MEDIUM’ WATCHLIST)
+            Sorted by priority (HIGH → MEDIUM → WATCHLIST)
           </p>
           <div className="flex gap-3 mt-4">
             <div className="px-4 py-2 bg-red-50 rounded-lg">
@@ -268,17 +261,17 @@ export default function Dashboard() {
                   if (lead.priority === 'HIGH') {
                     priorityBg = 'bg-red-100';
                     priorityText = 'text-red-800';
-                    priorityIcon = '';
+                    priorityIcon = '🔴';
                     barColor = '#EF4444';
                   } else if (lead.priority === 'MEDIUM') {
                     priorityBg = 'bg-yellow-100';
                     priorityText = 'text-yellow-800';
-                    priorityIcon = '';
+                    priorityIcon = '🟡';
                     barColor = '#F59E0B';
                   } else {
                     priorityBg = 'bg-gray-100';
                     priorityText = 'text-gray-700';
-                    priorityIcon = '';
+                    priorityIcon = '⚪';
                     barColor = '#9CA3AF';
                   }
 
@@ -355,7 +348,7 @@ export default function Dashboard() {
                           onClick={() => handleViewDetails(lead.provider_id)}
                           className="text-blue-600 hover:text-blue-800 font-semibold text-sm transition"
                         >
-                          View Details
+                          View Details →
                         </button>
                       </td>
                     </tr>
