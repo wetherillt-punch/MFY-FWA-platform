@@ -176,8 +176,8 @@ export function checkMedicalNecessity(claims: Claim[], providerId: string): {
   const byDate = new Map<string, Claim[]>();
   
   providerClaims.forEach(claim => {
-    if (timeBasedCodes.includes(claim.cpt_hcpcs)) {
-      const date = claim.service_date.split('T')[0];
+    if (claim.cpt_hcpcs && timeBasedCodes.includes(claim.cpt_hcpcs)) {
+      const date = claim.service_date.toISOString().split('T')[0];
       if (!byDate.has(date)) byDate.set(date, []);
       byDate.get(date)!.push(claim);
     }
