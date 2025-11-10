@@ -290,7 +290,7 @@ export default function AnalysisDisplay({ analysis }: AnalysisDisplayProps) {
                               </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-200">
-                              {rule.claims.slice(0, 10).map((claim, claimIndex) => (
+                                {rule.claims?.slice(0, 10).map((claim, claimIndex) => (
                                 <tr key={claimIndex} className="hover:bg-gray-50">
                                   <td className={`px-3 py-2 ${getHighlightClass('service_date', rule.highlightField)}`}>
                                     {claim.service_date}
