@@ -1,4 +1,4 @@
-import { Claim } from '@/types/detection';
+import { Claim } from '@/types';
 
 // LCD Frequency Limits - Maximum allowed frequency for procedures
 interface LCDLimit {
