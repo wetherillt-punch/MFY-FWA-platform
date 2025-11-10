@@ -315,7 +315,7 @@ export default function AnalysisDisplay({ analysis }: AnalysisDisplayProps) {
                                 Showing 10 of {rule.claims.length} claims
                               </p>
                               <button
-                                onClick={() => openClaimsModal(rule.claims, rule.rule_name)}
+                                onClick={() => openClaimsModal(rule.claims || [], rule.rule_name)}
                                 className="px-4 py-2 text-sm font-medium text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-300 rounded inline-flex items-center gap-2"
                               >
                                 <FileText className="w-4 h-4" />
