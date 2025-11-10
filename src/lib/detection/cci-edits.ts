@@ -53,7 +53,7 @@ export function checkCCIEdits(claims: Claim[], providerId: string): {
     const modifiers = dayClaims.map(c => c.modifiers || '');
     
     codes.forEach((code, i) => {
-      if (CCI_EDITS[code]) {
+      if (code && CCI_EDITS[code]) {
         codes.forEach((otherCode, j) => {
           if (i !== j && CCI_EDITS[code].includes(otherCode)) {
             const hasModifier59 = modifiers[i].includes('59') || modifiers[j].includes('59');
