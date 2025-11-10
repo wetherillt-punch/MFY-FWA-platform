@@ -309,7 +309,7 @@ export default function AnalysisDisplay({ analysis }: AnalysisDisplayProps) {
                               ))}
                             </tbody>
                           </table>
-                          {rule.claims.length > 10 && (
+                            {rule.claims && rule.claims.length > 10 && (
                             <div className="mt-3 flex items-center justify-between">
                               <p className="text-xs text-gray-600">
                                 Showing 10 of {rule.claims.length} claims
