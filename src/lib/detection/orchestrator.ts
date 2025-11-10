@@ -205,7 +205,7 @@ function analyzeTopCodes(claims: Claim[]) {
 
   claims.forEach(claim => {
     const code = claim.cpt_hcpcs;
-    const amount = parseFloat(claim.billed_amount || '0');
+    const amount = claim.billed_amount || 0;
     
     if (!codeMap.has(code)) {
       codeMap.set(code, {
