@@ -165,9 +165,7 @@ export default function AnalysisDisplay({ analysis }: AnalysisDisplayProps) {
                       ? 'text-red-600' 
                       : 'text-green-600'
                   }`}>
-                    {typeof analysis.comparative_analysis.claims_per_month.formatted_deviation === 'object' 
-                      ? analysis.comparative_analysis.claims_per_month.formatted_deviation.label 
-                      : analysis.comparative_analysis.claims_per_month.formatted_deviation}
+                  {analysis.comparative_analysis.claims_per_month.formatted_deviation}
                   </span>
                 </td>
               </tr>
@@ -181,9 +179,7 @@ export default function AnalysisDisplay({ analysis }: AnalysisDisplayProps) {
                       ? 'text-red-600' 
                       : 'text-green-600'
                   }`}>
-                    {typeof analysis.comparative_analysis.round_dollar_percent.formatted_deviation === 'object'
-                      ? analysis.comparative_analysis.round_dollar_percent.formatted_deviation.label
-                      : analysis.comparative_analysis.round_dollar_percent.formatted_deviation}
+                  {analysis.comparative_analysis.round_dollar_percent.formatted_deviation}
                   </span>
                 </td>
               </tr>
