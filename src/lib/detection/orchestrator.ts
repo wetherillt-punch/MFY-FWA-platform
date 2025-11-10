@@ -206,11 +206,11 @@ function analyzeTopCodes(claims: Claim[]) {
   claims.forEach(claim => {
     const code = claim.cpt_hcpcs;
     const amount = claim.billed_amount || 0;
-    
-    if (!codeMap.has(code)) {
-      codeMap.set(code, {
+
+  if (code && !codeMap.has(code)) {
+    codeMap.set(code, {
         code,
-        description: claim.cpt_description || code,
+        description: claim.cpt_description || code,    
         count: 0,
         totalBilled: 0,
         amounts: [],
