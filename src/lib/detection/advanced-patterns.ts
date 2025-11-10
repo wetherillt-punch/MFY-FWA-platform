@@ -66,7 +66,7 @@ export function detectAdvancedPatterns(
 // PHASE 1.1: Upcoding Detection (E&M Level Distribution)
 function detectUpcoding(claims: Claim[]) {
   // E&M codes: 99211-99215 (office visits)
-  const emCodes = claims.filter(c => /^9921[1-5]$/.test(c.cpt_hcpcs));
+  const emCodes = claims.filter(c => c.cpt_hcpcs &&  /^9921[1-5]$/.test(c.cpt_hcpcs));
   
   if (emCodes.length < 10) return null; // Need sample size
 
