@@ -1,4 +1,4 @@
-import { Claim } from '@/types/detection';
+import { Claim } from '@/types';
 
 // CCI Edits - Codes that should NOT be billed together (unbundling)
 const CCI_EDITS: Record<string, string[]> = {
