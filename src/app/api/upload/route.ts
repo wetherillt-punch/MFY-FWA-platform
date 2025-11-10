@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import * as XLSX from 'xlsx';
 import { runComprehensiveDetection } from '@/lib/detection/orchestrator';
-import { Claim } from '@/types/detection';
+import { Claim } from '@/types';
 import { normalizeDateToYYYYMMDD } from '@/lib/detection/date-utils';
 
 export async function POST(request: NextRequest) {
