@@ -42,7 +42,7 @@ export function checkCCIEdits(claims: Claim[], providerId: string): {
   // Group by date
   const byDate = new Map<string, Claim[]>();
   providerClaims.forEach(claim => {
-    const date = claim.service_date.split('T')[0];
+    const date = claim.service_date.toISOString().split('T')[0];
     if (!byDate.has(date)) byDate.set(date, []);
     byDate.get(date)!.push(claim);
   });
