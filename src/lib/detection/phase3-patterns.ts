@@ -98,7 +98,7 @@ export function detectPhase3Patterns(
 // Pattern 1: Modifier 25 Misuse Detection
 function detectModifier25Misuse(claims: Claim[]) {
   // E&M codes that commonly get modifier 25
-  const emCodes = claims.filter(c => /^9921[3-5]$/.test(c.cpt_hcpcs));
+  const emCodes = claims.filter(c => c.cpt_hcpcs &&  /^9921[3-5]$/.test(c.cpt_hcpcs));
   
   if (emCodes.length < 5) return null;
 
