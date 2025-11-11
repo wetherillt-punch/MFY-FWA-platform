@@ -7,25 +7,31 @@ interface AnalysisDisplayProps {
   analysis: {
     summary: string
     comparative_analysis: {
-      claims_per_month: {
+     claims_per_month: {
         provider: number
         peer: number
         deviation_percent: number
         formatted_deviation: string
-      }
-      round_dollar_percent: {
-        provider: number
-        peer: number
-        deviation_pp: number
-        formatted_deviation: string
-      }
-      total_flagged: {
-        provider: number
-        peer: number
-        deviation_percent: number
-        formatted_deviation: string
-      }
-    }
+     }
+     avg_claim_amount: {
+       provider: number
+       peer: number
+       deviation_percent: number
+       formatted_deviation: string
+     }
+     claims_per_patient: {
+       provider: number
+       peer: number
+       deviation_percent: number
+       formatted_deviation: string
+     }
+     flagged_claims_amount: {
+       provider: number
+       peer: number
+       deviation_percent: number
+       formatted_deviation: string
+     }
+   }
     detection_rules_triggered: Array<{
       tier: string
       rule_name: string
@@ -173,30 +179,44 @@ export default function AnalysisDisplay({ analysis }: AnalysisDisplayProps) {
                 </td>
               </tr>
               <tr>
-                <td className="px-6 py-4 text-sm font-medium text-gray-900">Round $ %</td>
-                <td className="px-6 py-4 text-sm text-gray-700">{analysis.comparative_analysis.round_dollar_percent.provider}%</td>
-                <td className="px-6 py-4 text-sm text-gray-700">{analysis.comparative_analysis.round_dollar_percent.peer}%</td>
+                <td className="px-6 py-4 text-sm font-medium text-gray-900">Avg Claim Amount</td>
+                <td className="px-6 py-4 text-sm text-gray-700">${analysis.comparative_analysis.avg_claim_amount.provider.toFixed(2)}</td>
+                <td className="px-6 py-4 text-sm text-gray-700">${analysis.comparative_analysis.avg_claim_amount.peer.toFixed(2)}</td>
                 <td className="px-6 py-4 text-sm">
                   <span className={`font-semibold ${
-                    analysis.comparative_analysis.round_dollar_percent.deviation_pp > 0 
-                      ? 'text-red-600' 
-                      : 'text-green-600'
+                    analysis.comparative_analysis.avg_claim_amount.deviation_percent > 0 
+                     ? 'text-red-600' 
+                     : 'text-green-600'
                   }`}>
-                  {analysis.comparative_analysis.round_dollar_percent.formatted_deviation}
+                  {analysis.comparative_analysis.avg_claim_amount.formatted_deviation}
                   </span>
                 </td>
-              </tr>
+               </tr>
+             <tr>
+               <td className="px-6 py-4 text-sm font-medium text-gray-900">Claims/Patient</td>
+               <td className="px-6 py-4 text-sm text-gray-700">{analysis.comparative_analysis.claims_per_patient.provider.toFixed(1)}</td>
+               <td className="px-6 py-4 text-sm text-gray-700">{analysis.comparative_analysis.claims_per_patient.peer.toFixed(1)}</td>
+               <td className="px-6 py-4 text-sm">
+                 <span className={`font-semibold ${
+                   analysis.comparative_analysis.claims_per_patient.deviation_percent > 0 
+                     ? 'text-red-600' 
+                     : 'text-green-600'
+                  }`}>
+                  {analysis.comparative_analysis.claims_per_patient.formatted_deviation}
+                </span>
+               </td>
+             </tr>
               <tr>
-                <td className="px-6 py-4 text-sm font-medium text-gray-900">Total flagged</td>
-                <td className="px-6 py-4 text-sm text-gray-700">${analysis.comparative_analysis.total_flagged.provider}</td>
-                <td className="px-6 py-4 text-sm text-gray-700">${analysis.comparative_analysis.total_flagged.peer}</td>
+                <td className="px-6 py-4 text-sm font-medium text-gray-900">Flagged Claims Amount</td>
+                <td className="px-6 py-4 text-sm text-gray-700">${analysis.comparative_analysis.flagged_claims_amount.provider}</td>
+                <td className="px-6 py-4 text-sm text-gray-700">${analysis.comparative_analysis.flagged_claims_amount.peer}</td>
                 <td className="px-6 py-4 text-sm">
                   <span className={`font-semibold ${
-                    analysis.comparative_analysis.total_flagged.deviation_percent > 0 
+                    analysis.comparative_analysis.flagged_claims_amount.deviation_percent > 0
                       ? 'text-red-600' 
                       : 'text-green-600'
                   }`}>
-                   {analysis.comparative_analysis.total_flagged.formatted_deviation}
+                   {analysis.comparative_analysis.flagged_claims_amount.formatted_deviation}
                   </span>
                 </td>
               </tr>

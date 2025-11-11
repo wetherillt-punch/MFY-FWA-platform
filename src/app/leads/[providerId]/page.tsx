@@ -16,9 +16,9 @@ export default function LeadDetailPage() {
     const stored = sessionStorage.getItem('fwa_results')
     if (stored) {
       const results = JSON.parse(stored)
-      const lead = results.detection.leads.find((l: any) => l.provider_id === params.providerId)
-      if (lead) {
-        setLeadData({ ...lead, fileName: results.fileName })
+      // New structure: lead is stored directly, not in detection.leads array
+      if (results.lead && results.lead.provider_id === params.providerId) {
+        setLeadData({ ...results.lead, fileName: results.fileName })
       }
     }
   }, [params.providerId])

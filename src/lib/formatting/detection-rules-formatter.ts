@@ -53,8 +53,8 @@ export function formatDetectionRules(lead: any) {
         narrative: narrative,
         threshold: "99th percentile + z-score >3.0",
         provider_value: formattedValue,
-        benchmark: `Peer avg: ${metric.peerAverage || 'undefined'}`,
-        evidence: `Percentile: ${metric.percentile || 'undefined'}th, Z-score: ${metric.zscore?.toFixed(2) || 'undefined'}`,
+        benchmark: metric.peerAverage ? `Peer avg: ${metric.peerAverage}` : 'Individual provider analysis (insufficient peer sample)',
+        evidence: (metric.percentile && metric.zscore) ? `Percentile: ${metric.percentile}th, Z-score: ${metric.zscore.toFixed(2)}` : (metric.zscore ? `Z-score: ${metric.zscore.toFixed(2)} exceeds threshold (${claimCount} claims analyzed). Peer comparison unavailable due to small sample size.` : `${metric.metric || metricName}: Value of ${formattedValue} flagged as statistical outlier based on ${claimCount} claims. Detection based on individual provider pattern analysis (peer cohort data unavailable).`),
         severity: (metric.zscore && metric.zscore > 4) ? "HIGH" : "MEDIUM",
         claims: [],  // Will be populated by page component
         highlightField: metricName.includes("Spike") ? "service_date" : "billed_amount",
@@ -98,7 +98,7 @@ export function formatDetectionRules(lead: any) {
           
         } else if (ev.total_wound_claims) {
           // Wound care frequency
-          evidenceStr = `${ev.total_wound_claims} wound care claims with ${ev.frequency_violations} violations`;
+          evidenceStr = `${ev.total_wound_claims} wound care claims analyzed. ${ev.frequency_violations} instances of treatments performed less than 14 days apart (Medicare requires ≥14 days between skin substitute procedures).`;
           narrative = `Provider submitted ${ev.total_wound_claims} skin substitute procedure claims, with ${ev.frequency_violations} instances showing treatments less than 14 days apart. Medicare coverage policy requires at least 14 days between treatments for wound healing. These ${ev.frequency_violations} violations suggest potential billing for medically unnecessary procedures or improper timing of treatments.`;
           
         } else if (pattern.pattern?.includes("Inflation") || pattern.pattern?.includes("Drift")) {

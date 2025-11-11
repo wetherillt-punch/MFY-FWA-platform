@@ -10,13 +10,22 @@ export const LeadAnalysisSchema = z.object({
   summary: z.string().describe('Executive summary of findings'),
   
   comparative_analysis: z.object({
-    claims_per_month: ComparativeMetricSchema,
-    round_dollar_percent: z.object({
+    claims_per_month: z.object({
       provider: z.number(),
       peer: z.number(),
-      deviation_pp: z.number()
+      deviation_percent: z.number()
     }),
-    total_flagged: z.object({
+    avg_claim_amount: z.object({
+      provider: z.number(),
+      peer: z.number(),
+      deviation_percent: z.number()
+    }),
+    claims_per_patient: z.object({
+      provider: z.number(),
+      peer: z.number(),
+      deviation_percent: z.number()
+    }),
+    flagged_claims_amount: z.object({
       provider: z.number(),
       peer: z.number(),
       deviation_percent: z.number()

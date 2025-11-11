@@ -66,30 +66,22 @@ export default function Dashboard() {
   };
 
   const handleViewDetails = (providerId: string) => {
-    if (data) {
-      // âœ… Extract claims from correct path (detection.allClaims)
-      const allClaims = data.detection?.allClaims || [];
-      
-      const results = {
-        detection: {
-          leads: data.detection?.leads || []
-        },
-        fileName: data.fileName || 'unknown',
-        allClaims: allClaims
-      };
-      
-      console.log('ðŸ"¦ Storing results:', {
-        leadCount: results.detection.leads.length,
-        claimCount: results.allClaims.length,
-        fileName: results.fileName
-      });
-      
-      // Store in both formats for compatibility
-      sessionStorage.setItem('fwa_results', JSON.stringify(results));
-      sessionStorage.setItem('detectionResults', JSON.stringify(data));
-    }
-    router.push(`/leads/${providerId}`);
-  };
+  if (data) {
+    // Only store the specific lead we need, not all data
+    const specificLead = data.detection?.leads?.find((l: any) => l.provider_id === providerId);
+    const allClaims = data.detection?.allClaims || [];
+    
+    const results = {
+      lead: specificLead,
+      fileName: data.fileName || 'unknown',
+      allClaims: allClaims
+    };
+    
+    // Store only what we need - remove the huge detectionResults
+    sessionStorage.setItem('fwa_results', JSON.stringify(results));
+  }
+  router.push(`/leads/${providerId}`);
+};
 
   // Sort leads by priority (HIGH → MEDIUM → WATCHLIST), then by score
 const leads = (data?.detection?.leads || []).sort((a: any, b: any) => {

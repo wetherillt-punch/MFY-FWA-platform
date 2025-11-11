@@ -22,23 +22,28 @@ export async function POST(request: NextRequest) {
 
 {
   "summary": "string - Executive summary in 2-3 sentences",
-  "comparative_analysis": {
-    "claims_per_month": {
-      "provider": number,
-      "peer": number,
-      "deviation_percent": number (negative if below peer, positive if above)
-    },
-    "round_dollar_percent": {
-      "provider": number,
-      "peer": number, 
-      "deviation_pp": number (percentage point difference)
-    },
-    "total_flagged": {
-      "provider": number,
-      "peer": number,
-      "deviation_percent": number
-    }
-  },
+  comparative_analysis: z.object({
+   claims_per_month: z.object({
+     provider: z.number(),
+     peer: z.number(),
+     deviation_percent: z.number()
+  }),
+   avg_claim_amount: z.object({
+     provider: z.number(),
+     peer: z.number(),
+     deviation_percent: z.number()
+   }),
+   claims_per_patient: z.object({
+     provider: z.number(),
+     peer: z.number(),
+     deviation_percent: z.number()
+   }),
+   flagged_claims_amount: z.object({
+     provider: z.number(),
+     peer: z.number(),
+     deviation_percent: z.number()
+  })
+ }),
   "detection_rules_triggered": [
     {
       "tier": "string (Tier 1, Tier 2, Tier 3, or Tier 4)",
@@ -64,6 +69,29 @@ export async function POST(request: NextRequest) {
   "next_steps": ["string", "string", ...],
   "estimated_overpayment": number (always positive)
 }
+
+CALCULATION INSTRUCTIONS:
+
+avg_claim_amount:
+- provider: Total billed amount ÷ claim count for this provider
+- peer: Average claim amount across peer providers
+- deviation_percent: ((provider - peer) / peer) × 100
+
+claims_per_patient:
+- provider: Total claims ÷ unique patient count for this provider
+- peer: Average claims per patient across peer providers
+- deviation_percent: ((provider - peer) / peer) × 100
+
+CALCULATION INSTRUCTIONS FOR flagged_claims_amount:
+The flagged_claims_amount represents the total dollar value of suspicious claims:
+- provider: Sum the billed_amount of ALL claims that triggered any detection rule (from tier metrics)
+- peer: Calculate expected billing for same number of flagged claims at peer average rates (peer_avg_per_claim × number_of_flagged_claims)
+- deviation_percent: ((provider - peer) / peer) × 100
+
+Example: If provider has 50 flagged claims totaling $25,000, and peers bill $400/claim on average:
+- provider: 25000
+- peer: 20000 (50 claims × $400)
+- deviation_percent: 25.0 (25% above peer rate)
 
 CRITICAL RULES:
 1. Return ONLY valid JSON - no markdown, no explanations
@@ -118,26 +146,32 @@ Return structured JSON analysis.`;
     const formattedAnalysis = {
       summary: validatedAnalysis.summary,
       
-      comparative_analysis: {
-        claims_per_month: {
-          ...validatedAnalysis.comparative_analysis.claims_per_month,
-          formatted_deviation: formatDeviation(
-            validatedAnalysis.comparative_analysis.claims_per_month.deviation_percent
-          )
-        },
-        round_dollar_percent: {
-          ...validatedAnalysis.comparative_analysis.round_dollar_percent,
-          formatted_deviation: formatDeviation(
-            validatedAnalysis.comparative_analysis.round_dollar_percent.deviation_pp
-          )
-        },
-        total_flagged: {
-          ...validatedAnalysis.comparative_analysis.total_flagged,
-          formatted_deviation: formatDeviation(
-            validatedAnalysis.comparative_analysis.total_flagged.deviation_percent
-          )
-        }
+    comparative_analysis: {
+      claims_per_month: {
+       ...validatedAnalysis.comparative_analysis.claims_per_month,
+       formatted_deviation: formatDeviation(
+        validatedAnalysis.comparative_analysis.claims_per_month.deviation_percent
+       )
       },
+      avg_claim_amount: {
+       ...validatedAnalysis.comparative_analysis.avg_claim_amount,
+       formatted_deviation: formatDeviation(
+        validatedAnalysis.comparative_analysis.avg_claim_amount.deviation_percent
+       )
+     },
+     claims_per_patient: {
+       ...validatedAnalysis.comparative_analysis.claims_per_patient,
+       formatted_deviation: formatDeviation(
+        validatedAnalysis.comparative_analysis.claims_per_patient.deviation_percent
+       )
+     },
+     flagged_claims_amount: {
+      ...validatedAnalysis.comparative_analysis.flagged_claims_amount,
+      formatted_deviation: formatDeviation(
+       validatedAnalysis.comparative_analysis.flagged_claims_amount.deviation_percent
+      )
+     }
+  },
       
       detection_rules_triggered: formatDetectionRules(lead).map(rule => ({
         ...rule,

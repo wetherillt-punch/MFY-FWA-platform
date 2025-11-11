@@ -21,22 +21,27 @@ export async function POST(request: NextRequest) {
 {
   "summary": "string - Executive summary in 2-3 sentences",
   "comparative_analysis": {
-    "claims_per_month": {
-      "provider": number,
-      "peer": number,
-      "deviation_percent": number (negative if below peer, positive if above)
-    },
-    "round_dollar_percent": {
-      "provider": number,
-      "peer": number, 
-      "deviation_pp": number (percentage point difference)
-    },
-    "total_flagged": {
-      "provider": number,
-      "peer": number,
-      "deviation_percent": number
-    }
+   "claims_per_month": {
+    "provider": number,
+    "peer": number,
+    "deviation_percent": number (negative if below peer, positive if above)
   },
+  "avg_claim_amount": {
+    "provider": number,
+    "peer": number,
+    "deviation_percent": number
+  },
+  "claims_per_patient": {
+    "provider": number,
+    "peer": number,
+    "deviation_percent": number
+  },
+  "flagged_claims_amount": {
+    "provider": number,
+    "peer": number,
+    "deviation_percent": number
+  }
+},
   "flagged_codes": [
     {
       "code": "string",
@@ -50,6 +55,17 @@ export async function POST(request: NextRequest) {
   "next_steps": ["string", "string", ...],
   "estimated_overpayment": number (always positive)
 }
+CALCULATION INSTRUCTIONS:
+
+avg_claim_amount:
+- provider: Total billed amount ÷ claim count for this provider
+- peer: Average claim amount across peer providers
+- deviation_percent: ((provider - peer) / peer) × 100
+
+claims_per_patient:
+- provider: Total claims ÷ unique patient count for this provider
+- peer: Average claims per patient across peer providers
+- deviation_percent: ((provider - peer) / peer) × 100
 
 CRITICAL RULES:
 1. Return ONLY valid JSON - no markdown, no explanations
@@ -117,11 +133,11 @@ Return structured JSON analysis.`;
             validatedAnalysis.comparative_analysis.round_dollar_percent.deviation_pp
           )
         },
-        total_flagged: {
-          ...validatedAnalysis.comparative_analysis.total_flagged,
-          formatted_deviation: formatDeviation(
-            validatedAnalysis.comparative_analysis.total_flagged.deviation_percent
-          )
+        flagged_claims_amount: {
+         ...validatedAnalysis.comparative_analysis.flagged_claims_amount,
+         formatted_deviation: formatDeviation(
+          validatedAnalysis.comparative_analysis.flagged_claims_amount.deviation_percent
+         )
         }
       },
       
