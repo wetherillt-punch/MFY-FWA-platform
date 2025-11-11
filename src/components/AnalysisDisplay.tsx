@@ -46,11 +46,14 @@ interface AnalysisDisplayProps {
       total_amount: number
       formatted_avg: string
       formatted_total: string
-    }>
-    priority: string
-    next_steps: string[]
-    estimated_overpayment: number
-    formatted_overpayment: string
+      }>
+      priority: {
+        color: string
+        label: string
+    }
+      next_steps: string[]
+      estimated_overpayment: number
+      formatted_overpayment: string
   }
 }
 
