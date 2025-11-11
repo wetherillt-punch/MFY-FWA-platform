@@ -91,7 +91,18 @@ export default function Dashboard() {
     router.push(`/leads/${providerId}`);
   };
 
-  const leads = data?.detection?.leads || [];
+  // Sort leads by priority (HIGH → MEDIUM → WATCHLIST), then by score
+const leads = (data?.detection?.leads || []).sort((a: any, b: any) => {
+  // Priority order: HIGH = 1, MEDIUM = 2, WATCHLIST = 3
+  const priorityOrder: Record<string, number> = { 'HIGH': 1, 'MEDIUM': 2, 'WATCHLIST': 3 };
+  const priorityDiff = (priorityOrder[a.priority] || 999) - (priorityOrder[b.priority] || 999);
+  
+  // Sort by priority first
+  if (priorityDiff !== 0) return priorityDiff;
+  
+  // Then by score (descending - highest first)
+  return (b.overallScore || 0) - (a.overallScore || 0);
+});
   const detection = data?.detection || {};
   const qualityReport = data?.qualityReport || {};
   const totalProviders = 68;

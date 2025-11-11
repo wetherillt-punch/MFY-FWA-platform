@@ -101,36 +101,52 @@ export function runComprehensiveDetection(
     (tier3.score * 0.15) +
     (tier4.score * 0.05);
 
-  // Determine priority - balanced to catch real fraud without noise
+ 
+ // Determine priority - tier-aware assignment
   let priority: 'HIGH' | 'MEDIUM' | 'WATCHLIST' = 'WATCHLIST';
+  
+  // Check if T4-only detection (drift only, no real violations)
+  const hasT1Violations = tier1.score > 0;
+  const hasT2Violations = tier2.score > 0;
+  const hasT3Violations = tier3.score > 0;
+  const hasT4Violations = tier4.score > 0;
+  
+  const isT4Only = !hasT1Violations && !hasT2Violations && !hasT3Violations && hasT4Violations;
   
   // Check for high-severity phase3 patterns (DME Tier A rules)
   const hasHighSeverityDME = phase3Patterns.patterns.some(
     (p: any) => p.severity === 'high' || p.tier === 'A'
   );
   
-  // HIGH Priority Logic:
-  // 1. Strong traditional tier scores
-  if ((tier1.score > 70 || tier2.score > 70) && overallScore >= 55) {
-    priority = 'HIGH';
-  }
-  // 2. DME Tier A rules (high-confidence fraud patterns)
-  else if (hasHighSeverityDME && phase3Patterns.score >= 50) {
-    priority = 'HIGH';
-  }
-  // 3. Multiple supporting violations
-  else if (overallScore >= 60 && (tier1.score + tier2.score) > 120) {
-    priority = 'HIGH';
-  }
-  // MEDIUM: Moderate scores or single-tier flags
-  else if (overallScore >= 40 || tier3.score > 60 || tier2.score > 65) {
-    priority = 'MEDIUM';
+  // T4-only detections can NEVER be HIGH or MEDIUM (just drift, not fraud)
+  if (isT4Only) {
+    priority = 'WATCHLIST';
+  } 
+  // HIGH Priority Logic - requires T1, T2, or high-severity DME
+  else {
+    // 1. Strong traditional tier scores (T1 or T2)
+    if ((tier1.score > 70 || tier2.score > 70) && overallScore >= 55 && (hasT1Violations || hasT2Violations)) {
+      priority = 'HIGH';
+    }
+    // 2. DME Tier A rules (high-confidence fraud patterns)
+    else if (hasHighSeverityDME && phase3Patterns.score >= 50) {
+      priority = 'HIGH';
+    }
+    // 3. Multiple supporting violations (T1 or T2 must be present)
+    else if (overallScore >= 60 && (tier1.score + tier2.score) > 120 && (hasT1Violations || hasT2Violations)) {
+      priority = 'HIGH';
+    }
+    // MEDIUM: Requires T1, T2, or T3 violations (not just T4)
+    else if ((overallScore >= 40 || tier3.score > 60 || tier2.score > 65) && 
+             (hasT1Violations || hasT2Violations || hasT3Violations)) {
+      priority = 'MEDIUM';
+    }
   }
 
-  // Boost priority for critical violations
-  if (cciResult.violations.length > 0 || 
+  // Boost priority for critical violations (only if not T4-only)
+  if (!isT4Only && (cciResult.violations.length > 0 || 
       lcdResult.violations.length > 0 || 
-      medicalNecessity.impossiblePatterns.length > 0) {
+      medicalNecessity.impossiblePatterns.length > 0)) {
     if (priority === 'WATCHLIST') priority = 'MEDIUM';
     if (priority === 'MEDIUM') priority = 'HIGH';
   }
