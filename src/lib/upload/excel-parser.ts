@@ -158,14 +158,8 @@ export function parseExcelFile(buffer: ArrayBuffer): ParseResult {
         if (columnMap.member_id && row[columnMap.member_id]) {
           claim.member_id = String(row[columnMap.member_id]).trim();
         }
-        if (columnMap.provider_zip && row[columnMap.provider_zip]) {
-          claim.provider_zip = String(row[columnMap.provider_zip]).trim();
-        }
         if (columnMap.place_of_service && row[columnMap.place_of_service]) {
           claim.place_of_service = String(row[columnMap.place_of_service]).trim();
-        }
-        if (columnMap.service_description && row[columnMap.service_description]) {
-          claim.service_description = String(row[columnMap.service_description]).trim();
         }
 
         claims.push(claim);
