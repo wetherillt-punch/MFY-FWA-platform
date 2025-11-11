@@ -217,7 +217,7 @@ function analyzeTopCodes(claims: Claim[]) {
         modifiers: []
       });
     }
-
+   if (code) {
     const entry = codeMap.get(code)!;
     entry.count++;
     entry.totalBilled += amount;
@@ -225,7 +225,8 @@ function analyzeTopCodes(claims: Claim[]) {
     if (claim.modifiers) {
       entry.modifiers.push(claim.modifiers);
     }
-  });
+ }  
+});
 
   return Array.from(codeMap.values())
     .sort((a, b) => b.totalBilled - a.totalBilled)
