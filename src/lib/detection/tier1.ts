@@ -27,7 +27,7 @@ export function detectTier1(claims: Claim[], providerId: string): Tier1Result {
   
   providerClaims.forEach(claim => {
     const memberId = (claim.member_id || 'UNKNOWN').trim().toUpperCase();
-    const serviceDate = (claim.service_date || '').trim();
+    const serviceDate = claim.service_date ? claim.service_date.toISOString().split('T')[0] : '';
     const code = (claim.cpt_hcpcs || '').trim().toUpperCase();
     const amount = Math.round(claim.billed_amount || 0 * 100) / 100;
     
