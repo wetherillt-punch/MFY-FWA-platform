@@ -34,7 +34,7 @@ function generateNormalProvider(
       service_date: randomDate(startDate, endDate),
       cpt_hcpcs: '99213',
       modifiers: undefined,      
-      billed_amount: randomAmount(50, 500),
+      billed_amount: Math.round(Math.random() * 500 + 50)
     });
   }
   
