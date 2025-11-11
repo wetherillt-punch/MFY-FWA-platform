@@ -158,7 +158,7 @@ function detectModifier25Misuse(claims: Claim[]) {
 function detectPOSDrift(claims: Claim[]) {
   // Office visit codes that should be POS 11 (office)
   const officeVisits = claims.filter(c => 
-    /^9921[3-5]$/.test(c.cpt_hcpcs)
+    c.cpt_hcpcs && /^9921[3-5]$/.test(c.cpt_hcpcs)
   );
 
   if (officeVisits.length < 10) return null;
