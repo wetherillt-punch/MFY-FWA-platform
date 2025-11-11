@@ -87,7 +87,7 @@ function checkBenfordLaw(claims: Claim[]): {
   const suspiciousClaimIds: string[] = [];
   
   const firstDigitData = claims.map(c => {
-    const amount = parseFloat(c.billed_amount || '0');
+    const amount = c.billed_amount || 0;
     const firstDigit = parseInt(amount.toString()[0]);
     return { claimId: c.claim_id, firstDigit, amount };
   }).filter(d => d.firstDigit > 0 && d.firstDigit <= 9);
@@ -163,7 +163,7 @@ function detectSpikes(claims: Claim[]): any {
   
   claims.forEach(claim => {
     const date = claim.service_date.split('T')[0];
-    const amount = parseFloat(claim.billed_amount || '0');
+    const amount = claim.billed_amount || 0;
     const existing = dailyData.get(date) || { total: 0, claimIds: [] };
     existing.total += amount;
     existing.claimIds.push(claim.claim_id);
@@ -204,13 +204,13 @@ function calculateGini(claims: Claim[]): { gini: number; repeatedClaimIds: strin
   const amountMap = new Map<number, string[]>();
   
   claims.forEach(c => {
-    const amount = parseFloat(c.billed_amount || '0');
+    const amount = c.billed_amount || 0;
     const existing = amountMap.get(amount) || [];
     existing.push(c.claim_id);
     amountMap.set(amount, existing);
   });
 
-  const amounts = claims.map(c => parseFloat(c.billed_amount || '0')).sort((a, b) => a - b);
+  const amounts = claims.map(c => c.billed_amount || 0).sort((a, b) => a - b);
   const n = amounts.length;
   const sum = amounts.reduce((a, b) => a + b, 0);
   

@@ -332,7 +332,7 @@ function detectBillingInflation(claims: Claim[]) {
     if (year < 2025) return;
     
     const monthKey = `${year}-${String(date.getMonth() + 1).padStart(2, '0')}`;
-    const amount = parseFloat(claim.billed_amount || '0');
+    const amount = claim.billed_amount || 0;
     
     if (!byMonth.has(monthKey)) byMonth.set(monthKey, []);
     byMonth.get(monthKey)!.push(amount);

@@ -35,7 +35,7 @@ export function calculatePeerBaselines(
     allClaims,
     providerId,
     (claims) => {
-      const amounts = claims.map(c => parseFloat(c.billed_amount || '0'));
+      const amounts = claims.map(c => c.billed_amount || 0);
       return amounts.reduce((a, b) => a + b, 0) / amounts.length;
     }
   );
@@ -50,7 +50,7 @@ export function calculatePeerBaselines(
     allClaims,
     providerId,
     (claims) => {
-      const amounts = claims.map(c => parseFloat(c.billed_amount || '0'));
+      const amounts = claims.map(c => c.billed_amount || 0);
       const roundCount = amounts.filter(a => a % 100 === 0).length;
       return (roundCount / amounts.length) * 100;
     }

@@ -62,7 +62,7 @@ function detectAnchoring(claims: Claim[]): any {
   const amountCounts = new Map<number, number>();
   
   claims.forEach(claim => {
-    const amount = Math.round(parseFloat(claim.billed_amount || '0'));
+    const amount = Math.round(claim.billed_amount || 0);
     amountCounts.set(amount, (amountCounts.get(amount) || 0) + 1);
   });
 
@@ -80,7 +80,7 @@ function detectAnchoring(claims: Claim[]): any {
 }
 
 function detectSplitting(claims: Claim[]): any {
-  const amounts = claims.map(c => parseFloat(c.billed_amount || '0'));
+  const amounts = claims.map(c => c.billed_amount || 0);
   const smallCount = amounts.filter(a => a < 50).length;
   const roundCount = amounts.filter(a => a % 100 === 0).length;
 
@@ -102,8 +102,8 @@ function detectStepUp(claims: Claim[]): any {
   const firstHalf = sorted.slice(0, midpoint);
   const secondHalf = sorted.slice(midpoint);
 
-  const avgBefore = firstHalf.reduce((sum, c) => sum + parseFloat(c.billed_amount || '0'), 0) / firstHalf.length;
-  const avgAfter = secondHalf.reduce((sum, c) => sum + parseFloat(c.billed_amount || '0'), 0) / secondHalf.length;
+  const avgBefore = firstHalf.reduce((sum, c) => sum + c.billed_amount || 0, 0) / firstHalf.length;
+  const avgAfter = secondHalf.reduce((sum, c) => sum + c.billed_amount || 0, 0) / secondHalf.length;
 
   const increasePercent = ((avgAfter - avgBefore) / avgBefore) * 100;
 

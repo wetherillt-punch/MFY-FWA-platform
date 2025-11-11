@@ -29,7 +29,7 @@ export function detectTier1(claims: Claim[], providerId: string): Tier1Result {
     const memberId = (claim.member_id || 'UNKNOWN').trim().toUpperCase();
     const serviceDate = (claim.service_date || '').trim();
     const code = (claim.cpt_hcpcs || '').trim().toUpperCase();
-    const amount = Math.round(parseFloat(claim.billed_amount || '0') * 100) / 100;
+    const amount = Math.round(claim.billed_amount || 0 * 100) / 100;
     
     const key = `${memberId}-${serviceDate}-${code}-${amount}`;
     
@@ -55,7 +55,7 @@ export function detectTier1(claims: Claim[], providerId: string): Tier1Result {
   // Round number detection
   const roundNumberClaimIds: string[] = [];
   const amounts = providerClaims.map(c => {
-    const amount = parseFloat(c.billed_amount || '0');
+    const amount = c.billed_amount || 0;
     if (Math.abs(amount % 100) < 0.01) {
       roundNumberClaimIds.push(c.claim_id);
     }

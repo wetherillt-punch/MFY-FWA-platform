@@ -55,8 +55,8 @@ function detectMedianDrift(claims: Claim[]): any {
   const early = sorted.slice(0, third);
   const late = sorted.slice(-third);
 
-  const initialMedian = getMedian(early.map(c => parseFloat(c.billed_amount || '0')));
-  const finalMedian = getMedian(late.map(c => parseFloat(c.billed_amount || '0')));
+  const initialMedian = getMedian(early.map(c => c.billed_amount || 0));
+  const finalMedian = getMedian(late.map(c => c.billed_amount || 0));
 
   const driftPercent = ((finalMedian - initialMedian) / initialMedian) * 100;
 
@@ -77,8 +77,8 @@ function detectEmergingRoundNumbers(claims: Claim[]): any {
   const early = sorted.slice(0, half);
   const recent = sorted.slice(half);
 
-  const earlyRound = (early.filter(c => parseFloat(c.billed_amount || '0') % 100 === 0).length / early.length) * 100;
-  const recentRound = (recent.filter(c => parseFloat(c.billed_amount || '0') % 100 === 0).length / recent.length) * 100;
+  const earlyRound = (early.filter(c => c.billed_amount || 0 % 100 === 0).length / early.length) * 100;
+  const recentRound = (recent.filter(c => c.billed_amount || 0 % 100 === 0).length / recent.length) * 100;
 
   return {
     detected: recentRound > earlyRound + 15,
