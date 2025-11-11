@@ -228,7 +228,7 @@ function detectTelehealthBursts(claims: Claim[]) {
   // Group by date
   const byDate = new Map<string, number>();
   telehealthClaims.forEach(claim => {
-    const date = claim.service_date;
+    const date = claim.service_date.toISOString().split('T')[0];
     byDate.set(date, (byDate.get(date) || 0) + 1);
   });
 
