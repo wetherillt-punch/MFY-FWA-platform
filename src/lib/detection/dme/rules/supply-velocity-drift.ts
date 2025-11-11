@@ -5,7 +5,7 @@ export function detectSupplyVelocityDrift(claims: any[], providerId: string): DM
   
   // CPAP and Diabetes supply codes
   const supplyCodes = /^A7[0-9]{3}$|^A4253$/;
-  const supplyClaims = providerClaims.filter(c => supplyCodes.test(c.cpt_hcpcs));
+  const supplyClaims = providerClaims.filter(c => c.cpt_hcpcs && supplyCodes.test(c.cpt_hcpcs));
   
   if (supplyClaims.length < 20) return null;
   

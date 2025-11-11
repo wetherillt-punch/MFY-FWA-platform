@@ -6,7 +6,7 @@ export function detectSerialReuse(claims: any[], providerId: string): DMEAnomaly
   // DME equipment with serial numbers
   const equipmentCodes = /^K000[1-9]$|^K001[0-9]$|^E0260$|^E0261$|^E1390$|^E0601$/;
   const equipmentClaims = providerClaims.filter(c => 
-    equipmentCodes.test(c.cpt_hcpcs) && c.serial_number
+    c.cpt_hcpcs && equipmentCodes.test(c.cpt_hcpcs) && c.serial_number
   );
   
   if (equipmentClaims.length < 5) return null;

@@ -5,7 +5,7 @@ export function detectRentalCapExceeded(claims: any[], providerId: string): DMEA
   
   // Rental equipment codes: E0601 (CPAP), E1390 (Oxygen), K0001+ (Wheelchairs)
   const rentalCodes = /^E0601$|^E1390$|^K000[1-9]$|^K001[0-9]$/;
-  const rentalClaims = providerClaims.filter(c => rentalCodes.test(c.cpt_hcpcs));
+  const rentalClaims = providerClaims.filter(c => c.cpt_hcpcs && rentalCodes.test(c.cpt_hcpcs));
   
   if (rentalClaims.length < 10) return null;
   

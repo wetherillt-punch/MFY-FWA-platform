@@ -5,7 +5,7 @@ export function detectCodeMixShift(claims: any[], providerId: string): DMEAnomal
   
   // Brace/Orthotic codes (L-codes)
   const braceCodes = /^L0650$|^L1902$|^L4361$/;
-  const braceClaims = providerClaims.filter(c => braceCodes.test(c.cpt_hcpcs));
+  const braceClaims = providerClaims.filter(c => c.cpt_hcpcs && braceCodes.test(c.cpt_hcpcs));
   
   if (braceClaims.length < 20) return null;
   

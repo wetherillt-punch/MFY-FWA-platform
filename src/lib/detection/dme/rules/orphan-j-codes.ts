@@ -5,13 +5,13 @@ export function detectOrphanJCodes(claims: any[], providerId: string): DMEAnomal
   
   // Infusion drug codes
   const jCodes = /^J1745$|^J1569$/;
-  const jCodeClaims = providerClaims.filter(c => jCodes.test(c.cpt_hcpcs));
+  const jCodeClaims = providerClaims.filter(c => c.cpt_hcpcs && jCodes.test(c.cpt_hcpcs));
   
   if (jCodeClaims.length < 5) return null;
   
   // Administration codes
   const adminCodes = /^96365$|^96366$/;
-  const adminClaims = providerClaims.filter(c => adminCodes.test(c.cpt_hcpcs));
+  const adminClaims = providerClaims.filter(c => c.cpt_hcpcs && adminCodes.test(c.cpt_hcpcs));
   
   const orphans: any[] = [];
   

@@ -5,7 +5,7 @@ export function detectInstitutionalOverlap(claims: any[], providerId: string): D
   
   // DME claims
   const dmeCodes = /^E[0-9]{4}$|^K[0-9]{4}$|^A[0-9]{4}$/;
-  const dmeClaims = providerClaims.filter(c => dmeCodes.test(c.cpt_hcpcs));
+  const dmeClaims = providerClaims.filter(c => c.cpt_hcpcs && dmeCodes.test(c.cpt_hcpcs));
   
   if (dmeClaims.length < 10) return null;
   

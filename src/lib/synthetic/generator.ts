@@ -108,7 +108,6 @@ function generateDuplicateBurst(
       cpt_hcpcs: '99213',
       modifiers: undefined,     
       billed_amount: dupAmount,
-      member_id: `MEM-${i}`, // Different members to avoid being exact duplicates
     });
   }
   
