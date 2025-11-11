@@ -32,6 +32,8 @@ function generateNormalProvider(
       claim_id: `CLM-${providerId}-${i.toString().padStart(6, '0')}`,
       provider_id: providerId,
       service_date: randomDate(startDate, endDate),
+      cpt_hcpcs: '99213',
+      modifiers: undefined,      
       billed_amount: randomAmount(50, 500),
     });
   }
