@@ -31,7 +31,9 @@ function generateNormalProvider(
     claims.push({
       claim_id: `CLM-${providerId}-${i.toString().padStart(6, '0')}`,
       provider_id: providerId,
+      member_id: `MEM-${Math.random().toString(36).substr(2, 9).toUpperCase()}`,      
       service_date: randomDate(startDate, endDate),
+      place_of_service: '11',      
       cpt_hcpcs: '99213',
       modifiers: undefined,      
       billed_amount: Math.round(Math.random() * 500 + 50)
@@ -56,7 +58,11 @@ function generateRoundNumberStorm(
     claims.push({
       claim_id: `CLM-${providerId}-${i.toString().padStart(6, '0')}`,
       provider_id: providerId,
+      member_id: `MEM-${Math.random().toString(36).substr(2, 9).toUpperCase()}`,    
       service_date: randomDate(startDate, endDate),
+      place_of_service: '11', // Office
+      cpt_hcpcs: '99213',
+      modifiers: undefined,
       billed_amount: randomAmount(50, 500, roundProb),
     });
   }
@@ -80,7 +86,11 @@ function generateDuplicateBurst(
     claims.push({
       claim_id: `CLM-${providerId}-${i.toString().padStart(6, '0')}`,
       provider_id: providerId,
+      member_id: `MEM-${Math.random().toString(36).substr(2, 9).toUpperCase()}`,
       service_date: randomDate(startDate, endDate),
+      place_of_service: '11', // Office
+      cpt_hcpcs: '99213',
+      modifiers: undefined,  
       billed_amount: randomAmount(50, 500),
     });
   }
@@ -92,7 +102,11 @@ function generateDuplicateBurst(
     claims.push({
       claim_id: `CLM-${providerId}-DUP-${i.toString().padStart(6, '0')}`,
       provider_id: providerId,
-      service_date: dupDate,
+      member_id: `MEM-${Math.random().toString(36).substr(2, 9).toUpperCase()}`,
+      service_date: randomDate(startDate, endDate),
+      place_of_service: '11', // Office
+      cpt_hcpcs: '99213',
+      modifiers: undefined,     
       billed_amount: dupAmount,
       member_id: `MEM-${i}`, // Different members to avoid being exact duplicates
     });
@@ -120,7 +134,11 @@ function generateSingleMonthSpike(
     claims.push({
       claim_id: `CLM-${providerId}-${i.toString().padStart(6, '0')}`,
       provider_id: providerId,
+      member_id: `MEM-${Math.random().toString(36).substr(2, 9).toUpperCase()}`,
       service_date: randomDate(startDate, endDate),
+      place_of_service: '11', // Office
+      cpt_hcpcs: '99213',
+      modifiers: undefined,   
       billed_amount: randomAmount(50, 500),
     });
   }
@@ -133,7 +151,11 @@ function generateSingleMonthSpike(
     claims.push({
       claim_id: `CLM-${providerId}-SPIKE-${i.toString().padStart(6, '0')}`,
       provider_id: providerId,
+      member_id: `MEM-${Math.random().toString(36).substr(2, 9).toUpperCase()}`,
       service_date: randomDate(spikeStart, spikeEnd),
+      place_of_service: '11',
+      cpt_hcpcs: '99213',
+      modifiers: undefined,
       billed_amount: randomAmount(50, 500),
     });
   }
@@ -162,7 +184,11 @@ function generateGradualDrift(
     claims.push({
       claim_id: `CLM-${providerId}-${i.toString().padStart(6, '0')}`,
       provider_id: providerId,
-      service_date: new Date(startDate.getTime() + periodMs * progress),
+      member_id: `MEM-${Math.random().toString(36).substr(2, 9).toUpperCase()}`,
+      service_date: randomDate(startDate, endDate),
+      place_of_service: '11', // Office
+      cpt_hcpcs: '99213',
+      modifiers: undefined,
       billed_amount: randomAmount(driftedAmount * 0.8, driftedAmount * 1.2, 0.15),
     });
   }
