@@ -108,7 +108,7 @@ export function extractRelevantClaims(lead: any, rule: any, allClaims: any[] = [
   if (ruleNameDisplay.includes('Spike') && rule.highlightValue) {
     const spikeDate = rule.highlightValue;
     return providerClaims
-      .filter((c: any) => c.service_date.includes(spikeDate))
+      .filter((c: any) => c.service_date.toISOString().includes(spikeDate))
       .slice(0, 100);
   }
   

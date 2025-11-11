@@ -146,7 +146,9 @@ export function parseExcelFile(buffer: ArrayBuffer): ParseResult {
         const claim: ClaimData = {
           claim_id,
           provider_id,
+          member_id: (columnMap.member_id && row[columnMap.member_id]) || 'UNKNOWN',
           service_date,
+          place_of_service: (columnMap.place_of_service && row[columnMap.place_of_service]) || '11',
           billed_amount,
         };
 
