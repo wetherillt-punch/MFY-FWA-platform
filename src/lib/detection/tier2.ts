@@ -162,7 +162,7 @@ function detectSpikes(claims: Claim[]): any {
   const dailyData = new Map<string, { total: number; claimIds: string[] }>();
   
   claims.forEach(claim => {
-    const date = claim.service_date.split('T')[0];
+    const date = claim.service_date.toISOString().split('T')[0];
     const amount = claim.billed_amount || 0;
     const existing = dailyData.get(date) || { total: 0, claimIds: [] };
     existing.total += amount;
