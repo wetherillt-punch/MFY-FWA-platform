@@ -29,7 +29,7 @@ export function detectInstitutionalOverlap(claims: any[], providerId: string): D
   
   console.log(`[Institutional-Overlap] Provider ${providerId}: ${overlaps.length} overlap claims (${overlapRate.toFixed(1)}%)`);
   
-  const avgAmount = overlaps.reduce((sum, c) => sum + parseFloat(c.billed_amount), 0) / overlaps.length;
+  const avgAmount = overlaps.reduce((sum, c) => sum + c.billed_amount, 0) / overlaps.length;
   const exposure = overlaps.length * avgAmount * 0.8; // Estimated 80% improper
   
   return {

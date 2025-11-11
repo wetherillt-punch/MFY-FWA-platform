@@ -39,7 +39,7 @@ export function detectCodeMixShift(claims: any[], providerId: string): DMEAnomal
   console.log(`[Code-Mix-Shift] Provider ${providerId}: ${shift.toFixed(1)}pp shift to higher-cost codes`);
   
   const highCostClaims = lateClaims.filter(c => higherAllowance.includes(c.cpt_hcpcs));
-  const avgAmount = highCostClaims.reduce((sum, c) => sum + parseFloat(c.billed_amount), 0) / highCostClaims.length;
+  const avgAmount = highCostClaims.reduce((sum, c) => sum + c.billed_amount, 0) / highCostClaims.length;
   const exposure = shift * avgAmount * 0.15;
   
   return {

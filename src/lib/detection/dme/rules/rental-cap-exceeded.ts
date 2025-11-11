@@ -72,7 +72,7 @@ export function detectRentalCapExceeded(claims: any[], providerId: string): DMEA
   
   console.log(`[Rental-Cap] Provider ${providerId}: ${violations} violations, ${violatingMembers.length} members`);
   
-  const avgAmount = rentalClaims.reduce((sum, c) => sum + parseFloat(c.billed_amount), 0) / rentalClaims.length;
+  const avgAmount = rentalClaims.reduce((sum, c) => sum + c.billed_amount, 0) / rentalClaims.length;
   const exposure = violations * avgAmount * 3; // Estimated 3 months over cap
   
   return {

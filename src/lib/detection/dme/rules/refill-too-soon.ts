@@ -72,7 +72,7 @@ export function detectRefillTooSoon(claims: any[], providerId: string): DMEAnoma
   if (violationRate < 25 && affectedMembers < 8) return null;
 
   // Calculate financial exposure (estimated)
-  const avgClaimAmount = supplyClaims.reduce((sum, c) => sum + parseFloat(c.billed_amount), 0) / supplyClaims.length;
+  const avgClaimAmount = supplyClaims.reduce((sum, c) => sum + c.billed_amount, 0) / supplyClaims.length;
   const totalExposure = totalViolations * avgClaimAmount;
 
   // Get exemplar claims (first 10 violations)

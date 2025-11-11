@@ -64,7 +64,7 @@ export function detectSerialReuse(claims: any[], providerId: string): DMEAnomaly
   console.log(`[Serial-Reuse] Provider ${providerId}: ${violations.length} violations, ${violatingSerials.length} serials`);
   
   const exemplarClaims = violations.flatMap(v => v.claims).slice(0, 20);
-  const avgAmount = exemplarClaims.reduce((sum, c) => sum + parseFloat(c.billed_amount), 0) / exemplarClaims.length;
+  const avgAmount = exemplarClaims.reduce((sum, c) => sum + c.billed_amount, 0) / exemplarClaims.length;
   const exposure = violations.length * avgAmount;
   
   return {

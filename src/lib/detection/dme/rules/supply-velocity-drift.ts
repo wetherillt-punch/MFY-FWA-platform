@@ -57,7 +57,7 @@ export function detectSupplyVelocityDrift(claims: any[], providerId: string): DM
   
   console.log(`[Velocity-Drift] Provider ${providerId}: ${driftDetails.increase}% increase from ${driftDetails.from} to ${driftDetails.to}`);
   
-  const avgAmount = supplyClaims.reduce((sum, c) => sum + parseFloat(c.billed_amount), 0) / supplyClaims.length;
+  const avgAmount = supplyClaims.reduce((sum, c) => sum + c.billed_amount, 0) / supplyClaims.length;
   const exposure = (driftDetails.increase / 100) * avgAmount * supplyClaims.length * 0.3;
   
   return {

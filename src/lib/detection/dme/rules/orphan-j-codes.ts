@@ -37,7 +37,7 @@ export function detectOrphanJCodes(claims: any[], providerId: string): DMEAnomal
   
   console.log(`[Orphan-JCodes] Provider ${providerId}: ${orphans.length} orphan drug claims`);
   
-  const avgAmount = orphans.reduce((sum, c) => sum + parseFloat(c.billed_amount), 0) / orphans.length;
+  const avgAmount = orphans.reduce((sum, c) => sum + c.billed_amount, 0) / orphans.length;
   const exposure = orphans.length * avgAmount * 0.5; // Estimated 50% improper
   
   return {

@@ -48,7 +48,7 @@ export function detectModifierMisuse(claims: any[], providerId: string): DMEAnom
     .filter(c => String(c.modifiers || '').toUpperCase().includes(violationType))
     .slice(0, 20);
   
-  const avgAmount = providerClaims.reduce((sum, c) => sum + parseFloat(c.billed_amount), 0) / providerClaims.length;
+  const avgAmount = providerClaims.reduce((sum, c) => sum + c.billed_amount, 0) / providerClaims.length;
   const exposure = (violationType === 'KX' ? kxCount : nuCount) * avgAmount * 0.3;
   
   return {
