@@ -98,7 +98,7 @@ export function detectPhase3Patterns(
 // Pattern 1: Modifier 25 Misuse Detection
 function detectModifier25Misuse(claims: Claim[]) {
   // E&M codes that commonly get modifier 25
-  const emCodes = claims.filter(c => c.cpt_hcpcs &&  /^9921[3-5]$/.test(c.cpt_hcpcs));
+  const emCodes = claims.filter(c => c.cpt_hcpcs &&  c.cpt_hcpcs && /^9921[3-5]$/.test(c.cpt_hcpcs));
   
   if (emCodes.length < 5) return null;
 
@@ -158,7 +158,7 @@ function detectModifier25Misuse(claims: Claim[]) {
 function detectPOSDrift(claims: Claim[]) {
   // Office visit codes that should be POS 11 (office)
   const officeVisits = claims.filter(c => 
-    c.cpt_hcpcs && /^9921[3-5]$/.test(c.cpt_hcpcs)
+    c.cpt_hcpcs && c.cpt_hcpcs && /^9921[3-5]$/.test(c.cpt_hcpcs)
   );
 
   if (officeVisits.length < 10) return null;
@@ -191,7 +191,7 @@ function detectPOSDrift(claims: Claim[]) {
 // Pattern 3: Psychotherapy Duration Creep
 function detectPsychotherapyCreep(claims: Claim[]) {
   const psychCodes = claims.filter(c => 
-    /^9083[2347]$/.test(c.cpt_hcpcs)
+    c.cpt_hcpcs && /^9083[2347]$/.test(c.cpt_hcpcs)
   );
 
   if (psychCodes.length < 10) return null;
@@ -263,7 +263,7 @@ function detectTelehealthBursts(claims: Claim[]) {
 function detectWoundCareFrequency(claims: Claim[]) {
   // Skin substitute codes: 15271, 15275
   const woundClaims = claims.filter(c => 
-    /^1527[15]$/.test(c.cpt_hcpcs)
+    c.cpt_hcpcs && /^1527[15]$/.test(c.cpt_hcpcs)
   );
 
   if (woundClaims.length < 3) return null;
