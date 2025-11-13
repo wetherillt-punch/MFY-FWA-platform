@@ -65,16 +65,24 @@ export function detectTier1(claims: Claim[], providerId: string): Tier1Result {
   const roundCount = amounts.filter(a => Math.abs(a % 100) < 0.01).length;
   const roundPct = (roundCount / amounts.length) * 100;
   
-  if (roundPct > 50) {
-    score += 80;
-    metrics.push({
-      metric: 'Round Number Clustering',
-      description: `${roundPct.toFixed(0)}% round-dollar amounts`,
-      value: `${roundPct.toFixed(0)}%`,
-      tier: 1,
-      flaggedClaimIds: roundNumberClaimIds
-    });
-  }
+  if (roundPct > 30) {
+  // Calculate score based on severity
+  let roundScore = 0;
+  if (roundPct > 80) roundScore = 100;      // Extreme
+  else if (roundPct > 70) roundScore = 90;   // Very high
+  else if (roundPct > 60) roundScore = 80;   // High
+  else if (roundPct > 50) roundScore = 70;   // Medium-high
+  else roundScore = 50;                      // Medium
+  
+  score += roundScore;
+  metrics.push({
+    metric: 'Round Number Clustering',
+    description: `${roundPct.toFixed(1)}% round-dollar amounts (${roundCount}/${amounts.length} claims)`,
+    value: `${roundPct.toFixed(1)}%`,
+    tier: 1,
+    flaggedClaimIds: roundNumberClaimIds
+  });
+}
 
   return { score: Math.min(score, 100), metrics };
 }

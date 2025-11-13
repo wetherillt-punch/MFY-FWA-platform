@@ -1,0 +1,241 @@
+/**
+ * Base Rule Class
+ * All detection rules inherit from this abstract class
+ */
+
+import { RuleConfig, RuleResult, RuleExecutor, DetectionContext, Evidence } from '../types';
+import { Claim } from '@/types';
+import { logRuleExecution, updateRuleMetrics } from '../config/db';
+
+export abstract class BaseRule implements RuleExecutor {
+  constructor(public config: RuleConfig) {}
+
+  /**
+   * Abstract method - must be implemented by each rule
+   */
+  abstract execute(
+    provider_id: string,
+    claims: Claim[],
+    config: RuleConfig,
+    context: DetectionContext
+  ): Promise<RuleResult>;
+
+  /**
+   * Validate rule configuration
+   */
+  validate(config: RuleConfig): boolean {
+    // Check required fields
+    if (!config.rule_id || !config.rule_name) {
+      console.error(`Invalid config: missing rule_id or rule_name`);
+      return false;
+    }
+
+    // Check thresholds exist
+    if (!config.thresholds || 
+        config.thresholds.flag_threshold === undefined ||
+        config.thresholds.high_priority_threshold === undefined) {
+      console.error(`Invalid config for ${config.rule_id}: missing thresholds`);
+      return false;
+    }
+
+    // Check weight is valid
+    if (config.weight < 0 || config.weight > 10) {
+      console.error(`Invalid config for ${config.rule_id}: weight must be between 0 and 10`);
+      return false;
+    }
+
+    return true;
+  }
+
+  /**
+   * Get human-readable description
+   */
+  getDescription(): string {
+    return this.config.description || 'No description available';
+  }
+
+  /**
+   * Execute with automatic logging and error handling
+   */
+  async executeWithLogging(
+    provider_id: string,
+    claims: Claim[],
+    context: DetectionContext
+  ): Promise<RuleResult> {
+    const startTime = Date.now();
+    let result: RuleResult;
+    let success = true;
+
+    try {
+      // Validate config before execution
+      if (!this.validate(this.config)) {
+        throw new Error('Invalid rule configuration');
+      }
+
+      // Execute the rule
+      result = await this.execute(provider_id, claims, this.config, context);
+      
+      // Add execution time
+      result.execution_time_ms = Date.now() - startTime;
+
+    } catch (error: any) {
+      success = false;
+      console.error(`Rule ${this.config.rule_id} failed:`, error);
+
+      // Return error result
+      result = {
+        rule_id: this.config.rule_id,
+        triggered: false,
+        score: 0,
+        confidence: 0,
+        evidence: [],
+        flagged_claim_ids: [],
+        dollar_impact: 0,
+        metadata: {},
+        execution_time_ms: Date.now() - startTime,
+        error: {
+          message: error.message || 'Unknown error',
+          stack: error.stack
+        }
+      };
+    }
+
+    // Log to database (async, don't wait)
+    this.logExecution(provider_id, result, context).catch(err => {
+      console.error(`Failed to log execution for ${this.config.rule_id}:`, err);
+    });
+
+    // Update metrics (async, don't wait)
+    updateRuleMetrics(
+      this.config.rule_id,
+      result.execution_time_ms || 0,
+      result.triggered,
+      success
+    ).catch(err => {
+      console.error(`Failed to update metrics for ${this.config.rule_id}:`, err);
+    });
+
+    return result;
+  }
+
+  /**
+   * Log execution to database
+   */
+  protected async logExecution(
+    provider_id: string,
+    result: RuleResult,
+    context: DetectionContext
+  ): Promise<void> {
+    await logRuleExecution({
+      rule_id: this.config.rule_id,
+      provider_id: provider_id,
+      executed_at: new Date(),
+      execution_time_ms: result.execution_time_ms || 0,
+      triggered: result.triggered,
+      score: result.score,
+      confidence: result.confidence,
+      evidence: result.evidence,
+      flagged_claim_count: result.flagged_claim_ids.length,
+      flagged_claim_ids: result.flagged_claim_ids,
+      dollar_impact: result.dollar_impact,
+      metadata: {
+        ...result.metadata,
+        specialty: context.specialty,
+        region: context.region,
+        provider_type: context.provider_type
+      },
+      success: !result.error,
+      error_message: result.error?.message,
+      error_stack: result.error?.stack
+    });
+  }
+
+  /**
+   * Calculate confidence score based on evidence strength
+   */
+  protected calculateConfidence(evidence: Evidence[]): number {
+    if (evidence.length === 0) return 0;
+
+    // Base confidence on number of evidence items and their deviations
+    let totalConfidence = 0;
+    
+    for (const ev of evidence) {
+      // Higher deviation = higher confidence
+      const deviationFactor = Math.min(Math.abs(ev.deviation) / 100, 1);
+      
+      // Severity multiplier
+      const severityMultiplier = 
+        ev.severity === 'CRITICAL' ? 1.5 :
+        ev.severity === 'HIGH' ? 1.2 :
+        ev.severity === 'MEDIUM' ? 1.0 : 0.8;
+      
+      totalConfidence += deviationFactor * severityMultiplier;
+    }
+
+    // Average and cap at 1.0
+    return Math.min(totalConfidence / evidence.length, 1.0);
+  }
+
+  /**
+   * Create a negative result (rule did not trigger)
+   */
+  protected createNegativeResult(): RuleResult {
+    return {
+      rule_id: this.config.rule_id,
+      triggered: false,
+      score: 0,
+      confidence: 0,
+      evidence: [],
+      flagged_claim_ids: [],
+      dollar_impact: 0,
+      metadata: {}
+    };
+  }
+
+  /**
+   * Calculate score based on threshold configuration
+   */
+  protected calculateScore(value: number, baseline: number): number {
+    const deviation = ((value - baseline) / baseline) * 100;
+    
+    if (deviation < this.config.thresholds.flag_threshold) {
+      return 0; // Not significant enough to flag
+    }
+    
+    if (deviation >= this.config.thresholds.high_priority_threshold) {
+      return 100; // Maximum score
+    }
+    
+    if (deviation >= this.config.thresholds.medium_priority_threshold) {
+      return 75;
+    }
+    
+    // Linear interpolation between flag and medium
+    const range = this.config.thresholds.medium_priority_threshold - this.config.thresholds.flag_threshold;
+    const position = deviation - this.config.thresholds.flag_threshold;
+    return 25 + (position / range) * 50;
+  }
+
+  /**
+   * Filter claims by date range
+   */
+  protected filterClaimsByDateRange(
+    claims: Claim[],
+    startDate: Date,
+    endDate: Date
+  ): Claim[] {
+    return claims.filter(claim => {
+      const claimDate = new Date(claim.service_date);
+      return claimDate >= startDate && claimDate <= endDate;
+    });
+  }
+
+  /**
+   * Calculate dollar impact from flagged claims
+   */
+  protected calculateDollarImpact(claims: Claim[], flaggedIds: string[]): number {
+    return claims
+      .filter(c => flaggedIds.includes(c.claim_id))
+      .reduce((sum, c) => sum + parseFloat(c.billed_amount || '0'), 0);
+  }
+}

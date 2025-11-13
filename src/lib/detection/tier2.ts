@@ -22,7 +22,7 @@ export function detectTier2(claims: Claim[], providerId: string, allProviders: s
 
   // 1. BENFORD'S LAW ANALYSIS
   const benfordResult = checkBenfordLaw(providerClaims);
-  if (benfordResult.violation && providerClaims.length >= 100) {
+  if (benfordResult.violation && providerClaims.length >= 50) {
     score += 70;
     metrics.push({
       metric: "Benford's Law Violation",

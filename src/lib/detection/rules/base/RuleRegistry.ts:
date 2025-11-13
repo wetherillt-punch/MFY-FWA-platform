@@ -1,0 +1,205 @@
+/**
+ * Rule Registry - Singleton pattern
+ * Manages loading, caching, and accessing detection rules
+ */
+
+import { RuleConfig, DetectionContext } from '../types';
+import { BaseRule } from './BaseRule';
+import { loadEnabledRules, loadRule, getApplicableOverrides, applyOverrides } from '../config/db';
+
+/**
+ * Cache configuration
+ */
+interface CacheConfig {
+  ttl: number; // Time to live in milliseconds
+  maxSize: number;
+}
+
+/**
+ * Cached rule entry
+ */
+interface CachedRule {
+  rule: BaseRule;
+  loadedAt: Date;
+}
+
+/**
+ * RuleRegistry - Singleton class for managing detection rules
+ */
+export class RuleRegistry {
+  private static instance: RuleRegistry;
+  private rulesCache: Map<string, CachedRule> = new Map();
+  private configCache: Map<string, RuleConfig> = new Map();
+  private lastFullLoad: Date | null = null;
+  
+  private cacheConfig: CacheConfig = {
+    ttl: 5 * 60 * 1000, // 5 minutes
+    maxSize: 100
+  };
+
+  /**
+   * Private constructor for singleton pattern
+   */
+  private constructor() {}
+
+  /**
+   * Get singleton instance
+   */
+  static getInstance(): RuleRegistry {
+    if (!RuleRegistry.instance) {
+      RuleRegistry.instance = new RuleRegistry();
+    }
+    return RuleRegistry.instance;
+  }
+
+  /**
+   * Load all enabled rules from database
+   */
+  async loadRules(): Promise<void> {
+    console.log('Loading detection rules from database...');
+    
+    try {
+      const configs = await loadEnabledRules();
+      
+      for (const config of configs) {
+        this.configCache.set(config.rule_id, config);
+      }
+      
+      this.lastFullLoad = new Date();
+      console.log(`✅ Loaded ${configs.length} rules`);
+    } catch (error) {
+      console.error('Failed to load rules:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get a rule configuration by ID
+   */
+  async getRuleConfig(rule_id: string): Promise<RuleConfig | null> {
+    // Check cache first
+    if (this.configCache.has(rule_id)) {
+      return this.configCache.get(rule_id)!;
+    }
+
+    // Load from database
+    const config = await loadRule(rule_id);
+    if (config) {
+      this.configCache.set(rule_id, config);
+    }
+    
+    return config;
+  }
+
+  /**
+   * Get rule configuration with context-specific overrides applied
+   */
+  async getRuleConfigWithOverrides(
+    rule_id: string,
+    context: DetectionContext
+  ): Promise<RuleConfig | null> {
+    const baseConfig = await this.getRuleConfig(rule_id);
+    if (!baseConfig) return null;
+
+    // Get applicable overrides
+    const overrides = await getApplicableOverrides(rule_id, {
+      specialty: context.specialty,
+      region: context.region,
+      provider_type: context.provider_type
+    });
+
+    // Apply overrides if any exist
+    if (overrides.length > 0) {
+      return applyOverrides(baseConfig, overrides);
+    }
+
+    return baseConfig;
+  }
+
+  /**
+   * Get all enabled rule configurations
+   */
+  getAllConfigs(): RuleConfig[] {
+    return Array.from(this.configCache.values()).filter(c => c.enabled);
+  }
+
+  /**
+   * Get rules by category
+   */
+  getRulesByCategory(category: string): RuleConfig[] {
+    return this.getAllConfigs().filter(c => c.category === category);
+  }
+
+  /**
+   * Clear cache (force reload on next access)
+   */
+  clearCache(): void {
+    this.rulesCache.clear();
+    this.configCache.clear();
+    this.lastFullLoad = null;
+    console.log('Rule cache cleared');
+  }
+
+  /**
+   * Check if cache needs refresh
+   */
+  private needsRefresh(): boolean {
+    if (!this.lastFullLoad) return true;
+    
+    const now = new Date();
+    const elapsed = now.getTime() - this.lastFullLoad.getTime();
+    
+    return elapsed > this.cacheConfig.ttl;
+  }
+
+  /**
+   * Ensure rules are loaded and fresh
+   */
+  async ensureLoaded(): Promise<void> {
+    if (this.needsRefresh()) {
+      await this.loadRules();
+    }
+  }
+
+  /**
+   * Get cache statistics
+   */
+  getCacheStats() {
+    return {
+      configCacheSize: this.configCache.size,
+      rulesCacheSize: this.rulesCache.size,
+      lastFullLoad: this.lastFullLoad,
+      cacheAge: this.lastFullLoad 
+        ? Date.now() - this.lastFullLoad.getTime() 
+        : null
+    };
+  }
+
+  /**
+   * Register a rule class (for future use when we implement actual rule classes)
+   */
+  private ruleClasses: Map<string, new (config: RuleConfig) => BaseRule> = new Map();
+
+  registerRuleClass(rule_id: string, ruleClass: new (config: RuleConfig) => BaseRule): void {
+    this.ruleClasses.set(rule_id, ruleClass);
+  }
+
+  /**
+   * Instantiate a rule (for future use)
+   */
+  async instantiateRule(rule_id: string, context: DetectionContext): Promise<BaseRule | null> {
+    const config = await this.getRuleConfigWithOverrides(rule_id, context);
+    if (!config) return null;
+
+    const RuleClass = this.ruleClasses.get(rule_id);
+    if (!RuleClass) {
+      console.warn(`No rule class registered for ${rule_id}`);
+      return null;
+    }
+
+    return new RuleClass(config);
+  }
+}
+
+// Export singleton instance
+export const ruleRegistry = RuleRegistry.getInstance();

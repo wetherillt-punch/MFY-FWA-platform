@@ -1,0 +1,16 @@
+/**
+ * Database Connection
+ * Drizzle ORM instance for PostgreSQL (Neon)
+ */
+
+import { drizzle } from 'drizzle-orm/neon-http';
+import { neon } from '@neondatabase/serverless';
+
+// Create Neon client
+const sql = neon(process.env.DATABASE_URL!);
+
+// Create Drizzle instance
+export const db = drizzle(sql);
+
+// Export schemas
+export * from './schema-rules';

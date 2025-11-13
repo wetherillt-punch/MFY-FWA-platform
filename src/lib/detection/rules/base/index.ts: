@@ -1,0 +1,6 @@
+/**
+ * Base Module Exports
+ */
+
+export { BaseRule } from './BaseRule';
+export { RuleRegistry, ruleRegistry } from './RuleRegistry';

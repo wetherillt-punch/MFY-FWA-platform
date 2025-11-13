@@ -19,16 +19,51 @@ export default function Dashboard() {
   const router = useRouter();
 
   useEffect(() => {
-    if (data && resultsRef.current) {
-      setTimeout(() => {
-        resultsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      }, 100);
+  // Try to restore from backup first (set when viewing lead detail)
+  const backup = sessionStorage.getItem('fwa_dashboard_backup');
+  if (backup) {
+    try {
+      const restoredData = JSON.parse(backup);
+      if (restoredData.detection?.leads) {
+        console.log('✅ Restored dashboard from backup:', {
+          leadCount: restoredData.detection.leads.length,
+          hasDetection: true
+        });
+        setData(restoredData);
+        // Restore fwa_results to full data
+        sessionStorage.setItem('fwa_results', backup);
+        return;
+      }
+    } catch (e) {
+      console.error('Failed to parse backup:', e);
     }
-  }, [data]);
+  }
+  
+  // Fallback to regular fwa_results
+  const stored = sessionStorage.getItem('fwa_results');
+  if (stored) {
+    try {
+      const restoredData = JSON.parse(stored);
+      if (restoredData.detection?.leads) {
+        console.log('✅ Restored data from sessionStorage:', {
+          leadCount: restoredData.detection.leads.length,
+          hasDetection: true
+        });
+        setData(restoredData);
+      }
+    } catch (e) {
+      console.error('Failed to parse sessionStorage:', e);
+      sessionStorage.removeItem('fwa_results');
+    }
+  }
+}, []);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+  
+    // Clear ALL old storage
+    sessionStorage.clear();
 
     setUploading(true);
     setError(null);
@@ -45,13 +80,16 @@ export default function Dashboard() {
         return response.json();
       })
       .then(result => {
-        console.log('Upload successful:', result);
-        console.log('Detection object:', result.detection);
-        console.log('Leads array:', result.detection?.leads);
-        setData(result);
-        sessionStorage.setItem('fwa_results', JSON.stringify(result));
-        setUploading(false);
-      })
+  console.log('Upload successful:', result);
+  console.log('Detection object:', result.detection);
+  console.log('Leads array:', result.detection?.leads);
+  setData(result);
+  
+  // ✅ STORE the full upload result
+  sessionStorage.setItem('fwa_results', JSON.stringify(result));
+  
+  setUploading(false);
+})
       .catch(err => {
         console.error('Upload error:', err);
         setError(err.message);
@@ -67,37 +105,40 @@ export default function Dashboard() {
 
   const handleViewDetails = (providerId: string) => {
   if (data) {
-    // Only store the specific lead we need, not all data
+    const allClaims = data.allClaims || [];
     const specificLead = data.detection?.leads?.find((l: any) => l.provider_id === providerId);
-    const allClaims = data.detection?.allClaims || [];
     
-    const results = {
+    const leadDetailData = {
       lead: specificLead,
       fileName: data.fileName || 'unknown',
       allClaims: allClaims
     };
     
-    // Store only what we need - remove the huge detectionResults
-    sessionStorage.setItem('fwa_results', JSON.stringify(results));
+    // Store lead detail data (overwrites dashboard data temporarily)
+    sessionStorage.setItem('fwa_results', JSON.stringify(leadDetailData));
+    
+    // ALSO keep full data in a backup key so we can restore dashboard
+    sessionStorage.setItem('fwa_dashboard_backup', JSON.stringify(data));
   }
   router.push(`/leads/${providerId}`);
 };
 
-  // Sort leads by priority (HIGH → MEDIUM → WATCHLIST), then by score
-const leads = (data?.detection?.leads || []).sort((a: any, b: any) => {
-  // Priority order: HIGH = 1, MEDIUM = 2, WATCHLIST = 3
-  const priorityOrder: Record<string, number> = { 'HIGH': 1, 'MEDIUM': 2, 'WATCHLIST': 3 };
-  const priorityDiff = (priorityOrder[a.priority] || 999) - (priorityOrder[b.priority] || 999);
-  
-  // Sort by priority first
-  if (priorityDiff !== 0) return priorityDiff;
-  
-  // Then by score (descending - highest first)
-  return (b.overallScore || 0) - (a.overallScore || 0);
-});
   const detection = data?.detection || {};
   const qualityReport = data?.qualityReport || {};
   const totalProviders = 68;
+  
+  // Sort leads by priority (HIGH → MEDIUM → WATCHLIST), then by score
+  const leads = (data?.detection?.leads || []).sort((a: any, b: any) => {
+    // Priority order: HIGH = 1, MEDIUM = 2, WATCHLIST = 3
+    const priorityOrder: Record<string, number> = { 'HIGH': 1, 'MEDIUM': 2, 'WATCHLIST': 3 };
+    const priorityDiff = (priorityOrder[a.priority] || 999) - (priorityOrder[b.priority] || 999);
+    
+    // Sort by priority first
+    if (priorityDiff !== 0) return priorityDiff;
+    
+    // Then by score (descending - highest first)
+    return (b.overallScore || 0) - (a.overallScore || 0);
+  });
   const leadCount = data?.detection?.leads?.length || 0;
 
   if (!data) {
