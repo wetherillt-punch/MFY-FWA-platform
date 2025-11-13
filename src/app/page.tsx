@@ -105,7 +105,7 @@ export default function Dashboard() {
 
   const handleViewDetails = (providerId: string) => {
   if (data) {
-    const allClaims = data.allClaims || [];
+    const allClaims = data.detection?.allClaims || [];
     const specificLead = data.detection?.leads?.find((l: any) => l.provider_id === providerId);
     
     const leadDetailData = {
