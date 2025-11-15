@@ -177,7 +177,7 @@ function executeFrequencyRule(rule: DatabaseRule, claims: Claim[]): DatabaseRule
   }
   
   const relevantClaims = claims.filter(c => 
-    targetCodes.includes(c.cpt_hcpcs)
+    c.cpt_hcpcs && targetCodes.includes(c.cpt_hcpcs)
   );
   
   const frequency = relevantClaims.length;
@@ -254,7 +254,7 @@ function executeTemporalRule(rule: DatabaseRule, claims: Claim[]): DatabaseRuleR
   }
   
   const relevantClaims = claims
-    .filter(c => targetCodes.includes(c.cpt_hcpcs))
+    .filter(c => c.cpt_hcpcs && targetCodes.includes(c.cpt_hcpcs))
     .sort((a, b) => a.service_date.getTime() - b.service_date.getTime());
   
   if (relevantClaims.length < 2) {
@@ -311,7 +311,7 @@ function executeDMERule(rule: DatabaseRule, claims: Claim[]): DatabaseRuleResult
     return createEmptyResult(rule);
   }
   
-  const dmeClaims = claims.filter(c => targetCodes.includes(c.cpt_hcpcs));
+  const dmeClaims = claims.filter(c => c.cpt_hcpcs && targetCodes.includes(c.cpt_hcpcs));
   const dmeRate = (dmeClaims.length / claims.length) * 100;
   const threshold = thresholds.max_dme_rate || 30;
   
