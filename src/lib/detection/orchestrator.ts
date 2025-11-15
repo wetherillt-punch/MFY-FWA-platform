@@ -88,7 +88,7 @@ export async function runComprehensiveDetection(
   claims: Claim[],
   providerId: string,
   allProviders: string[]
-): DetectionResult {
+): Promise<DetectionResult> {
   const providerClaims = claims.filter(c => c.provider_id === providerId);
   
   if (providerClaims.length === 0) {
