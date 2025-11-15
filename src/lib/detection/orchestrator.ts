@@ -8,6 +8,7 @@ import { checkLCDLimits, checkMedicalNecessity } from './lcd-limits';
 import { calculatePeerBaselines } from './peer-baselines';
 import { detectAdvancedPatterns } from './advanced-patterns';
 import { detectPhase3Patterns } from './phase3-patterns';
+import { executeAllDatabaseRules, DatabaseRuleResult } from './rule-executor';
 
 export interface DetectionResult {
   provider_id: string;
@@ -66,8 +67,24 @@ export interface DetectionResult {
     severity: string;
   }>;
 }
+/**
+ * Calculate weighted score from database rules
+ */
+function calculateDatabaseRuleScore(results: DatabaseRuleResult[]): number {
+  if (results.length === 0) return 0;
+  
+  const triggeredRules = results.filter(r => r.triggered);
+  if (triggeredRules.length === 0) return 0;
+  
+  const weightedSum = triggeredRules.reduce((sum, rule) => {
+    const weight = rule.confidence || 0.5;
+    return sum + (rule.score * weight);
+  }, 0);
+  
+  return Math.min(100, weightedSum / triggeredRules.length);
+}
 
-export function runComprehensiveDetection(
+export async function runComprehensiveDetection(
   claims: Claim[],
   providerId: string,
   allProviders: string[]
@@ -84,6 +101,8 @@ export function runComprehensiveDetection(
   const tier3 = detectTier3(claims, providerId);
   const tier4 = detectTier4(claims, providerId);
   const advancedPatterns = detectAdvancedPatterns(claims, providerId);
+  const databaseRules = await executeAllDatabaseRules(providerId, claims);
+  const databaseScore = calculateDatabaseRuleScore(databaseRules);
   const phase3Patterns = detectPhase3Patterns(claims, providerId);
 
   // Run advanced checks
@@ -95,10 +114,11 @@ export function runComprehensiveDetection(
   // Calculate overall score (weighted)
   const overallScore = 
     (advancedPatterns.score * 0.08) +
-    (phase3Patterns.score * 0.20) +  // Increased from 0.10 for DME rules
-    (tier1.score * 0.28) +
-    (tier2.score * 0.22) +
-    (tier3.score * 0.15) +
+    (phase3Patterns.score * 0.18) +  // Reduced from 0.20
+    (databaseScore * 0.12) +         // NEW: Database rules
+    (tier1.score * 0.24) +           // Reduced from 0.28
+    (tier2.score * 0.20) +           // Reduced from 0.22
+    (tier3.score * 0.13) +           // Reduced from 0.15
     (tier4.score * 0.05);
 
  
@@ -391,8 +411,10 @@ function createEmptyResult(providerId: string): DetectionResult {
     hasDailyPattern: false,
     matchedRules: [],
     advancedPatterns: [],
-    phase3Patterns: [],  };
+    phase3Patterns: [],  
+  };
 }
 
 // Legacy export for backwards compatibility
 export const runDetection = runComprehensiveDetection;
+

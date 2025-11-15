@@ -7,13 +7,6 @@ import { useRouter } from 'next/navigation';
 export default function Dashboard() {
   const [uploading, setUploading] = useState(false);
   const [data, setData] = useState<any>(null);
-   useEffect(() => {
-   const stored = sessionStorage.getItem('fwa_results');
-   if (stored) {
-    const restoredData = JSON.parse(stored);
-    setData(restoredData);
-  }
-}, []);
   const [error, setError] = useState<string | null>(null);
   const resultsRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
@@ -59,43 +52,60 @@ export default function Dashboard() {
 }, []);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-  
-    // Clear ALL old storage
-    sessionStorage.clear();
+  const file = e.target.files?.[0];
+  if (!file) return;
 
-    setUploading(true);
-    setError(null);
+  console.log('📁 File selected:', {
+    name: file.name,
+    size: file.size,
+    type: file.type
+  });
 
-    const formData = new FormData();
-    formData.append('file', file);
+  setUploading(true);
+  setError(null);
 
-    fetch('/api/upload', {
-      method: 'POST',
-      body: formData,
-    })
-      .then(response => {
-        if (!response.ok) throw new Error('Upload failed');
-        return response.json();
-      })
-      .then(result => {
-  console.log('Upload successful:', result);
-  console.log('Detection object:', result.detection);
-  console.log('Leads array:', result.detection?.leads);
-  setData(result);
-  
-  // ✅ STORE the full upload result
-  sessionStorage.setItem('fwa_results', JSON.stringify(result));
-  
-  setUploading(false);
-})
-      .catch(err => {
-        console.error('Upload error:', err);
-        setError(err.message);
-        setUploading(false);
+  const formData = new FormData();
+  formData.append('file', file);
+
+  console.log('📤 Sending upload request...');
+
+  fetch('/api/upload', {
+    method: 'POST',
+    body: formData,
+  })
+    .then(async response => {
+      console.log('📥 Response received:', {
+        ok: response.ok,
+        status: response.status,
+        statusText: response.statusText
       });
-  };
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('❌ API Error Response:', errorText);
+        throw new Error(`Upload failed (${response.status}): ${errorText}`);
+      }
+      return response.json();
+    })
+    .then(result => {
+      console.log('✅ Upload successful:', result);
+      console.log('Detection object:', result.detection);
+      console.log('Leads array:', result.detection?.leads);
+      setData(result);
+      
+      sessionStorage.setItem('fwa_results', JSON.stringify(result));
+      
+      setUploading(false);
+    })
+    .catch(err => {
+      console.error('❌ Upload error:', err);
+      console.error('❌ Error type:', err.constructor.name);
+      console.error('❌ Error message:', err.message);
+      console.error('❌ Full error:', err);
+      setError(`Upload failed: ${err.message}`);
+      setUploading(false);
+    });
+};
 
   const handleNewUpload = () => {
     setData(null);
@@ -139,6 +149,7 @@ export default function Dashboard() {
     // Then by score (descending - highest first)
     return (b.overallScore || 0) - (a.overallScore || 0);
   });
+  
   const leadCount = data?.detection?.leads?.length || 0;
 
   if (!data) {

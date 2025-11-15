@@ -402,6 +402,14 @@ model DetectionRule {
   @@index([isBuiltIn])
   @@index([isActive])
   @@index([createdBy])
+    executionLogs      RuleExecutionLog[]
+  
+  // Performance tracking
+  executionCount     Int      @default(0)
+  totalTriggers      Int      @default(0)
+  lastExecuted       DateTime?
+  avgExecutionTimeMs Float?
+  successRate        Float?
 }
 
 model RuleVersion {
@@ -520,4 +528,30 @@ enum RuleStatus {
   ACTIVE       // Rule is live
   DISABLED     // Rule is temporarily disabled
   ARCHIVED     // Rule is deprecated
+}
+// ============================================================================
+// RULE EXECUTION LOGGING
+// ============================================================================
+
+model RuleExecutionLog {
+  id                 String   @id @default(cuid())
+  ruleId             String
+  providerId         String
+  executedAt         DateTime @default(now())
+  executionTimeMs    Int
+  triggered          Boolean
+  score              Float
+  confidence         Float
+  evidence           Json
+  flaggedClaimCount  Int
+  flaggedClaimIds    String[]
+  dollarImpact       Float
+  success            Boolean
+  errorMessage       String?
+  
+  rule               DetectionRule @relation(fields: [ruleId], references: [id], onDelete: Cascade)
+  
+  @@index([ruleId])
+  @@index([providerId])
+  @@index([executedAt])
 }
